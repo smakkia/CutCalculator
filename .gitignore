@@ -22,3 +22,17 @@
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
+
+# Rendered catalog pages (temporary, generated from the PDF for inspection)
+.pdf_pages/
+
+# Compiled output
+out/
+target/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# Screenshot dei cataloghi (materiale di riferimento, non versionato)
+cat */
