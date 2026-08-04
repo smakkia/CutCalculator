@@ -36,3 +36,6 @@ target/
 
 # Screenshot dei cataloghi (materiale di riferimento, non versionato)
 cat */
+
+# Guida locale per Claude Code (non versionata)
+CLAUDE.md
