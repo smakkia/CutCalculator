@@ -14,7 +14,7 @@ import java.util.List;
  */
 public class Ordine {
 
-    private final String nome;
+    private String nome;
     private final List<Serramento> serramenti = new ArrayList<>();
 
     public Ordine(String nome) {
@@ -23,6 +23,11 @@ public class Ordine {
 
     public String nome() {
         return nome;
+    }
+
+    /** Rinomina l'ordine: correggerne il nome è una delle modifiche che l'utente può fare. */
+    public void rinomina(String nome) {
+        this.nome = nome;
     }
 
     /** Aggiunge un serramento in coda; ritorna {@code this} per l'uso a catena. */

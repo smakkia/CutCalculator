@@ -36,13 +36,13 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.2</version>
             </plugin>
-            <!-- Esegue la demo con: mvn compile exec:java -->
+            <!-- Client testuale interattivo:  mvn compile exec:java -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.5.0</version>
                 <configuration>
-                    <mainClass>com.cutcalculator.App</mainClass>
+                    <mainClass>com.cutcalculator.cli.CliApp</mainClass>
                 </configuration>
             </plugin>
         </plugins>
