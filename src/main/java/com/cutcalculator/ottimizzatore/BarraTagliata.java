@@ -1,0 +1,103 @@
+package com.cutcalculator.ottimizzatore;
+
+import com.cutcalculator.dominio.Pezzo;
+import com.cutcalculator.dominio.Profilo;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Una singola barra grezza presa a magazzino, con i pezzi già tagliati dentro.
+ * È l'unità che l'ottimizzatore riempie, un pezzo alla volta, finché c'è spazio.
+ * <p>
+ * Una barra appartiene a <b>un solo profilo</b>: da lei si possono ricavare solo
+ * pezzi di quel profilo (un telaio non esce da una barra d'anta). È <b>mutabile</b>,
+ * perché l'ottimizzatore ci aggiunge pezzi progressivamente.
+ * <p>
+ * Può essere un <b>avanzo</b> già in magazzino (gratis, di proprietà) oppure una
+ * <b>barra nuova</b> da comprare: lo dice il flag {@link #avanzo()}. Il preventivo
+ * conta come materiale da acquistare solo le barre nuove.
+ * <p>
+ * Modello del kerf (spessore della lama): semplice, ogni pezzo "costa"
+ * {@code lunghezza + kerf}, quindi {@code occupato = Σ lunghezze + n·kerf}. Anche il
+ * primo pezzo paga un kerf, il che tiene conto di un po' di spuntatura ai bordi.
+ */
+public class BarraTagliata {
+
+    /** Spessore della lama a ogni taglio, in mm. */
+    private static final double KERF = 4.0;
+
+    /** Tolleranza per i confronti tra double (le lunghezze sono in mm). */
+    private static final double EPS = 1e-9;
+
+    private final Profilo profilo;
+    private final double lunghezzaBarra;
+    private final boolean avanzo;
+    private final List<Pezzo> pezzi = new ArrayList<>();
+
+    public BarraTagliata(Profilo profilo, double lunghezzaBarra, boolean avanzo) {
+        this.profilo = profilo;
+        this.lunghezzaBarra = lunghezzaBarra;
+        this.avanzo = avanzo;
+    }
+
+    /** Spazio consumato: somma delle lunghezze più un kerf per ogni pezzo. */
+    public double occupato() {
+        return pezzi.stream().mapToDouble(Pezzo::lunghezza).sum() + pezzi.size() * KERF;
+    }
+
+    /** Spazio ancora libero sulla barra (lo scarto se la si chiudesse così com'è). */
+    public double sfrido() {
+        return lunghezzaBarra - occupato();
+    }
+
+    /**
+     * Il pezzo ci starebbe? Verifica solo la lunghezza: si assume che il profilo sia
+     * quello giusto (l'ottimizzatore raggruppa i pezzi per profilo prima di riempire).
+     */
+    public boolean entra(Pezzo pezzo) {
+        return occupato() + pezzo.lunghezza() + KERF <= lunghezzaBarra + EPS;
+    }
+
+    /**
+     * Colloca il pezzo sulla barra.
+     *
+     * @throws IllegalArgumentException se il pezzo è di un profilo diverso (codice diverso)
+     * @throws IllegalStateException    se il pezzo non ci sta (chiama prima {@link #entra})
+     */
+    public void aggiungi(Pezzo pezzo) {
+        if (!pezzo.profilo().codice().equals(profilo.codice())) {
+            throw new IllegalArgumentException(
+                    "Pezzo del profilo " + pezzo.profilo().codice()
+                            + " non collocabile su una barra del profilo " + profilo.codice());
+        }
+        if (!entra(pezzo)) {
+            throw new IllegalStateException(
+                    "Il pezzo (" + pezzo.lunghezza() + " mm) non entra: sfrido residuo "
+                            + sfrido() + " mm");
+        }
+        pezzi.add(pezzo);
+    }
+
+    public Profilo profilo() {
+        return profilo;
+    }
+
+    public double lunghezzaBarra() {
+        return lunghezzaBarra;
+    }
+
+    /** {@code true} se è uno spezzone di magazzino riusato, {@code false} se è una barra nuova da comprare. */
+    public boolean avanzo() {
+        return avanzo;
+    }
+
+    public double kerf() {
+        return KERF;
+    }
+
+    /** Vista in sola lettura dei pezzi collocati, nell'ordine di taglio. */
+    public List<Pezzo> pezzi() {
+        return List.copyOf(pezzi);
+    }
+}

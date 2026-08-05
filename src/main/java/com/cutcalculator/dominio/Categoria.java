@@ -10,6 +10,7 @@ package com.cutcalculator.dominio;
 public enum Categoria {
     TELAIO,
     ANTA,
+    MONTANTE,
     FERMAVETRO,
-    ALTRO
+    ASTINA
 }
