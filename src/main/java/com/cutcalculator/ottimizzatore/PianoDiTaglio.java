@@ -1,6 +1,6 @@
 package com.cutcalculator.ottimizzatore;
 
-import com.cutcalculator.dominio.Profilo;
+import com.cutcalculator.dominio.Materiale;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -60,18 +60,18 @@ public record PianoDiTaglio(List<BarraTagliata> barre) {
         return Math.exp(sommaLog / barre.size());
     }
 
-    /** Barre raggruppate per profilo (nuove e avanzi), nell'ordine in cui compaiono. */
-    public Map<Profilo, List<BarraTagliata>> perProfilo() {
+    /** Barre raggruppate per {@link Materiale} (profilo + colore), nell'ordine in cui compaiono. */
+    public Map<Materiale, List<BarraTagliata>> perMateriale() {
         return barre.stream().collect(Collectors.groupingBy(
-                BarraTagliata::profilo, LinkedHashMap::new, Collectors.toList()));
+                BarraTagliata::materiale, LinkedHashMap::new, Collectors.toList()));
     }
 
-    /** Numero di barre nuove per profilo: la riga base del preventivo. */
-    public Map<Profilo, Integer> barreNuovePerProfilo() {
-        Map<Profilo, Integer> conteggio = new LinkedHashMap<>();
+    /** Numero di barre nuove per {@link Materiale}: la riga base del preventivo. */
+    public Map<Materiale, Integer> barreNuovePerMateriale() {
+        Map<Materiale, Integer> conteggio = new LinkedHashMap<>();
         for (BarraTagliata barra : barre) {
             if (!barra.avanzo()) {
-                conteggio.merge(barra.profilo(), 1, Integer::sum);
+                conteggio.merge(barra.materiale(), 1, Integer::sum);
             }
         }
         return conteggio;

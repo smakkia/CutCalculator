@@ -7,6 +7,9 @@ import com.cutcalculator.formule.Distinta;
 import com.cutcalculator.formule.GeneratoreDistinta;
 import com.cutcalculator.ottimizzatore.BestFitDecreasing;
 import com.cutcalculator.ottimizzatore.PianoDiTaglio;
+import com.cutcalculator.persistenza.ArchivioMagazzino;
+import com.cutcalculator.pianificazione.EvasioneOrdini;
+import com.cutcalculator.pianificazione.PianificatoreOrdini;
 import com.cutcalculator.preventivo.GeneratorePreventivo;
 import com.cutcalculator.preventivo.Preventivo;
 
@@ -26,11 +29,25 @@ import java.util.List;
 public final class Controller {
 
     private final Catalogo catalogo;
+    private final ArchivioMagazzino archivio;
     private final List<Avanzo> magazzino = new ArrayList<>();
     private final List<Ordine> ordini = new ArrayList<>();
 
+    /** Solo in memoria, senza persistenza: comodo per test o usi effimeri. */
     public Controller(Catalogo catalogo) {
+        this(catalogo, null);
+    }
+
+    /**
+     * Collega un {@link ArchivioMagazzino}: il magazzino viene <b>caricato</b> da disco
+     * all'avvio e <b>risalvato</b> a ogni modifica. Con {@code archivio} null resta in memoria.
+     */
+    public Controller(Catalogo catalogo, ArchivioMagazzino archivio) {
         this.catalogo = catalogo;
+        this.archivio = archivio;
+        if (archivio != null) {
+            magazzino.addAll(archivio.carica());
+        }
     }
 
     // --- Lettura dello stato -----------------------------------------------------------
@@ -44,6 +61,11 @@ public final class Controller {
         return List.copyOf(magazzino);
     }
 
+    /** Numero totale di spezzoni a magazzino: la somma delle quantità di ogni {@link Avanzo}. */
+    public int totaleAvanzi() {
+        return magazzino.stream().mapToInt(Avanzo::quantita).sum();
+    }
+
     /** Vista in sola lettura degli ordini (l'ordine è quello di inserimento). */
     public List<Ordine> ordini() {
         return List.copyOf(ordini);
@@ -53,16 +75,56 @@ public final class Controller {
 
     public void aggiungiAvanzo(Avanzo avanzo) {
         magazzino.add(avanzo);
+        salva();
     }
 
-    /** Rimuove l'avanzo alla posizione data e lo restituisce. */
-    public Avanzo rimuoviAvanzo(int indice) {
-        return magazzino.remove(indice);
+    /**
+     * Toglie {@code quantita} spezzoni dall'avanzo alla posizione data. Se sono tutti (o più),
+     * rimuove l'intera riga; altrimenti la sostituisce con una copia dalla quantità ridotta
+     * (l'{@link Avanzo} è immutabile).
+     *
+     * @return l'avanzo aggiornato che resta a magazzino, oppure {@code null} se la riga è sparita
+     */
+    public Avanzo rimuoviAvanzo(int indice, int quantita) {
+        Avanzo avanzo = magazzino.get(indice);
+        Avanzo rimasto;
+        if (quantita >= avanzo.quantita()) {
+            magazzino.remove(indice);
+            rimasto = null;
+        } else {
+            rimasto = new Avanzo(avanzo.profilo(), avanzo.colore(),
+                    avanzo.lunghezza(), avanzo.quantita() - quantita);
+            magazzino.set(indice, rimasto);
+        }
+        salva();
+        return rimasto;
+    }
+
+    /**
+     * Svuota il magazzino: rimuove <b>tutti</b> gli spezzoni presenti e persiste.
+     *
+     * @return quanti spezzoni sono stati rimossi in totale
+     */
+    public int svuotaMagazzino() {
+        int totale = totaleAvanzi();
+        magazzino.clear();
+        salva();
+        return totale;
+    }
+
+    /** Persiste il magazzino se c'è un archivio collegato (altrimenti resta solo in memoria). */
+    private void salva() {
+        if (archivio != null) {
+            archivio.salva(magazzino);
+        }
     }
 
     // --- Operazioni sugli ordini -------------------------------------------------------
 
-    /** Crea un ordine con questo nome, lo aggiunge e lo restituisce (l'{@link Ordine} è modificabile). */
+    /**
+     * Crea un ordine con questo nome, lo aggiunge e lo restituisce (l'{@link Ordine} è modificabile).
+     * Il colore si sceglie sul singolo {@link com.cutcalculator.dominio.Serramento}, non sull'ordine.
+     */
     public Ordine nuovoOrdine(String nome) {
         Ordine ordine = new Ordine(nome);
         ordini.add(ordine);
@@ -86,6 +148,27 @@ public final class Controller {
         PianoDiTaglio piano = new BestFitDecreasing().ottimizza(distinta, magazzino);
         Preventivo preventivo = new GeneratorePreventivo().genera(piano);
         return new Risultato(distinta, piano, preventivo);
+    }
+
+    /** La soglia (mm) sopra cui un ritaglio rientra in magazzino come nuovo avanzo. */
+    public double sogliaRitaglio() {
+        return PianificatoreOrdini.SOGLIA_RITAGLIO_DEFAULT;
+    }
+
+    /**
+     * Calcolo <b>globale</b>: pianifica <b>tutti</b> gli ordini insieme sul magazzino condiviso
+     * (ogni avanzo va a un solo ordine, vedi {@link PianificatoreOrdini}) e poi <b>applica</b> il
+     * risultato — sostituisce il magazzino con quello aggiornato (avanzi usati consumati, ritagli
+     * sopra soglia rientrati) e lo persiste. A differenza di {@link #calcola}, questo <b>consuma</b>.
+     *
+     * @throws IllegalArgumentException se un pezzo è più lungo della barra standard
+     */
+    public EvasioneOrdini evadiOrdini() {
+        EvasioneOrdini evasione = new PianificatoreOrdini().pianifica(ordini, magazzino);
+        magazzino.clear();
+        magazzino.addAll(evasione.magazzinoAggiornato());
+        salva();
+        return evasione;
     }
 
     /** I tre output della pipeline per un ordine. */

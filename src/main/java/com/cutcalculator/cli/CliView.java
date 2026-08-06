@@ -3,7 +3,9 @@ package com.cutcalculator.cli;
 import com.cutcalculator.catalogo.Catalogo;
 import com.cutcalculator.catalogo.Sistema;
 import com.cutcalculator.dominio.Avanzo;
+import com.cutcalculator.dominio.Colore;
 import com.cutcalculator.dominio.Dimensione;
+import com.cutcalculator.dominio.Materiale;
 import com.cutcalculator.dominio.Ordine;
 import com.cutcalculator.dominio.Pezzo;
 import com.cutcalculator.dominio.Profilo;
@@ -15,6 +17,7 @@ import com.cutcalculator.formule.Distinta;
 import com.cutcalculator.ottimizzatore.BarraTagliata;
 import com.cutcalculator.ottimizzatore.Ottimizzatore;
 import com.cutcalculator.ottimizzatore.PianoDiTaglio;
+import com.cutcalculator.pianificazione.EvasioneOrdini;
 import com.cutcalculator.preventivo.Preventivo;
 import com.cutcalculator.preventivo.RigaProfilo;
 
@@ -69,7 +72,7 @@ public final class CliView implements View {
     private boolean menuPrincipale() {
         System.out.println();
         System.out.println("=== MENU PRINCIPALE ===");
-        System.out.println("  1) Magazzino  (" + conta(controller.magazzino().size(), "avanzo", "avanzi") + ")");
+        System.out.println("  1) Magazzino  (" + conta(controller.totaleAvanzi(), "pezzo", "pezzi") + ")");
         System.out.println("  2) Ordini     (" + conta(controller.ordini().size(), "ordine", "ordini") + ")");
         System.out.println("  0) Esci");
         switch (leggiIntero("Scelta", 0, 2)) {
@@ -88,15 +91,17 @@ public final class CliView implements View {
         boolean resta = true;
         while (resta) {
             System.out.println();
-            System.out.println("=== MAGAZZINO (" + conta(controller.magazzino().size(), "avanzo", "avanzi") + ") ===");
-            System.out.println("  1) Aggiungi avanzo");
+            System.out.println("=== MAGAZZINO (" + conta(controller.totaleAvanzi(), "pezzo", "pezzi") + ") ===");
+            System.out.println("  1) Aggiungi pezzo");
             System.out.println("  2) Mostra magazzino");
-            System.out.println("  3) Rimuovi avanzo");
+            System.out.println("  3) Rimuovi pezzo");
+            System.out.println("  4) Svuota magazzino");
             System.out.println("  0) Indietro");
-            switch (leggiIntero("Scelta", 0, 3)) {
+            switch (leggiIntero("Scelta", 0, 4)) {
                 case 1 -> aggiungiAvanzo();
                 case 2 -> mostraMagazzino();
                 case 3 -> rimuoviAvanzo();
+                case 4 -> svuotaMagazzino();
                 case 0 -> resta = false;
             }
         }
@@ -106,15 +111,17 @@ public final class CliView implements View {
         Sistema sistema = scegliSistema();
         Profilo profilo = scegliDaLista(
                 "Profili di " + sistema.nome() + ":", profiliDi(sistema), this::etichetta);
-        double lunghezza = leggiMisura("Lunghezza avanzo");
+        Colore colore = leggiColore("Colore");
+        double lunghezza = leggiMisura("Lunghezza pezzo");
         int quantita = leggiQuantita("Quantita'");
-        controller.aggiungiAvanzo(new Avanzo(profilo, lunghezza, quantita));
-        System.out.printf("  + avanzo %s  %s mm  x%d%n", etichetta(profilo), num(lunghezza), quantita);
+        controller.aggiungiAvanzo(new Avanzo(profilo, colore, lunghezza, quantita));
+        System.out.printf("  + pezzo %s [%s]  %s mm  x%d%n",
+                etichetta(profilo), colore.nome(), num(lunghezza), quantita);
     }
 
     private void mostraMagazzino() {
         if (controller.magazzino().isEmpty()) {
-            System.out.println("  Magazzino vuoto: aggiungi un avanzo (opzione 1).");
+            System.out.println("  Magazzino vuoto: aggiungi un pezzo (opzione 1).");
             return;
         }
         magazzino(controller.magazzino());
@@ -131,9 +138,34 @@ public final class CliView implements View {
         if (scelta == 0) {
             return;
         }
-        Avanzo tolto = controller.rimuoviAvanzo(scelta - 1);
-        System.out.printf("  Rimosso: %s  %s mm x%d%n",
-                etichetta(tolto.profilo()), num(tolto.lunghezza()), tolto.quantita());
+        Avanzo avanzo = avanzi.get(scelta - 1);
+        int quantita = avanzo.quantita() == 1
+                ? 1
+                : leggiIntero("Quanti toglierne", 1, avanzo.quantita());
+        Avanzo rimasto = controller.rimuoviAvanzo(scelta - 1, quantita);
+        if (rimasto == null) {
+            System.out.printf("  Rimosso: %s [%s]  %s mm x%d%n",
+                    etichetta(avanzo.profilo()), avanzo.colore().nome(), num(avanzo.lunghezza()), quantita);
+        } else {
+            System.out.printf("  Tolti x%d: %s [%s]  %s mm  (restano x%d)%n", quantita,
+                    etichetta(rimasto.profilo()), rimasto.colore().nome(), num(rimasto.lunghezza()), rimasto.quantita());
+        }
+    }
+
+    /** Svuota l'intero magazzino, previa conferma (l'operazione riscrive il file su disco). */
+    private void svuotaMagazzino() {
+        int n = controller.totaleAvanzi();
+        if (n == 0) {
+            System.out.println("  Magazzino gia' vuoto: niente da svuotare.");
+            return;
+        }
+        if (!prompt("  Svuotare tutto il magazzino (" + conta(n, "pezzo", "pezzi") + ")? [s/N]> ")
+                .trim().equalsIgnoreCase("s")) {
+            System.out.println("  Annullato: magazzino invariato.");
+            return;
+        }
+        int rimossi = controller.svuotaMagazzino();
+        System.out.printf("  Magazzino svuotato: rimossi %s.%n", conta(rimossi, "pezzo", "pezzi"));
     }
 
     // --- Sezione ORDINI ----------------------------------------------------------------
@@ -147,12 +179,14 @@ public final class CliView implements View {
             System.out.println("  2) Mostra ordini");
             System.out.println("  3) Apri ordine");
             System.out.println("  4) Rimuovi ordine");
+            System.out.println("  5) Calcola tutti gli ordini (scarico magazzino)");
             System.out.println("  0) Indietro");
-            switch (leggiIntero("Scelta", 0, 4)) {
+            switch (leggiIntero("Scelta", 0, 5)) {
                 case 1 -> nuovoOrdine();
                 case 2 -> mostraOrdini();
                 case 3 -> apriOrdine();
                 case 4 -> rimuoviOrdine();
+                case 5 -> evadiOrdini();
                 case 0 -> resta = false;
             }
         }
@@ -176,7 +210,7 @@ public final class CliView implements View {
         for (int i = 0; i < ordini.size(); i++) {
             Ordine o = ordini.get(i);
             System.out.printf("  %d) %-30s (%s)%n", i + 1, o.nome(),
-                    conta(o.serramenti().size(), "serramento", "serramenti"));
+                    conta(o.totaleSerramenti(), "serramento", "serramenti"));
         }
     }
 
@@ -207,6 +241,32 @@ public final class CliView implements View {
         return scelta == 0 ? null : ordini.get(scelta - 1);
     }
 
+    /**
+     * Calcolo globale su tutti gli ordini: chiede conferma (è distruttivo per il magazzino), poi
+     * delega al controller che pianifica, <b>scarica</b> gli avanzi usati, fa rientrare i ritagli
+     * sopra soglia e salva. Mostra i piani per ordine e il preventivo totale.
+     */
+    private void evadiOrdini() {
+        boolean qualcosaDaFare = controller.ordini().stream().anyMatch(o -> !o.serramenti().isEmpty());
+        if (!qualcosaDaFare) {
+            System.out.println("  Nessun ordine con serramenti da calcolare.");
+            return;
+        }
+        System.out.printf("  Il calcolo globale scarica il magazzino: gli avanzi usati vengono consumati e"
+                + " i ritagli >= %s mm rientrano. L'operazione salva su disco.%n", num(controller.sogliaRitaglio()));
+        if (!prompt("  Confermi? [s/N]> ").trim().equalsIgnoreCase("s")) {
+            System.out.println("  Annullato: magazzino invariato.");
+            return;
+        }
+        try {
+            evasione(controller.evadiOrdini());
+            System.out.printf("%n  Magazzino aggiornato e salvato (%s).%n",
+                    conta(controller.totaleAvanzi(), "pezzo", "pezzi"));
+        } catch (IllegalArgumentException pezzoTroppoLungo) {
+            System.out.println("  Impossibile calcolare: " + pezzoTroppoLungo.getMessage());
+        }
+    }
+
     // --- Gestione di un singolo ordine -------------------------------------------------
 
     private void gestisciOrdine(Ordine ordine) {
@@ -214,7 +274,7 @@ public final class CliView implements View {
         while (resta) {
             System.out.println();
             System.out.println("=== ORDINE: " + ordine.nome() + "  ("
-                    + conta(ordine.serramenti().size(), "serramento", "serramenti") + ") ===");
+                    + conta(ordine.totaleSerramenti(), "serramento", "serramenti") + ") ===");
             System.out.println("  1) Aggiungi serramento");
             System.out.println("  2) Mostra serramenti");
             System.out.println("  3) Rimuovi serramento");
@@ -236,12 +296,13 @@ public final class CliView implements View {
         Sistema sistema = scegliSistema();
         Tipologia tipologia = scegliDaLista(
                 "Tipologie di " + sistema.nome() + ":", sistema.tipologie(), Tipologia::nome);
+        Colore colore = leggiColore("Colore");
         double l = leggiMisura("Larghezza L");
         double h = leggiMisura("Altezza H");
         int quantita = leggiQuantita("Quantita'");
-        ordine.aggiungi(new Serramento(tipologia, l, h, quantita));
-        System.out.printf("  + %s / %s  %s x %s mm  x%d%n",
-                sistema.nome(), tipologia.nome(), num(l), num(h), quantita);
+        ordine.aggiungi(new Serramento(tipologia, colore, l, h, quantita));
+        System.out.printf("  + %s / %s [%s]  %s x %s mm  x%d%n",
+                sistema.nome(), tipologia.nome(), colore.nome(), num(l), num(h), quantita);
     }
 
     private void rimuoviSerramento(Ordine ordine) {
@@ -341,6 +402,17 @@ public final class CliView implements View {
         }
     }
 
+    /** Legge un colore come testo libero (nome commerciale o codice RAL); non può essere vuoto. */
+    private Colore leggiColore(String etichetta) {
+        while (true) {
+            String riga = prompt(etichetta + "> ").trim();
+            if (!riga.isBlank()) {
+                return new Colore(riga);
+            }
+            System.out.println("  Inserisci un colore (es. bianco, bronzo, RAL9010).");
+        }
+    }
+
     /** Legge una misura in mm; accetta sia la virgola sia il punto come separatore decimale. */
     private double leggiMisura(String etichetta) {
         while (true) {
@@ -396,8 +468,8 @@ public final class CliView implements View {
         int i = 1;
         for (Serramento s : ordine.serramenti()) {
             Dimensione d = s.dimensione();
-            System.out.printf(" %2d. %-32s %6s x %-6s mm   x%d%n",
-                    i++, s.tipologia().nome(), num(d.L()), num(d.H()), s.quantita());
+            System.out.printf(" %2d. %-32s %-10s %6s x %-6s mm   x%d%n",
+                    i++, s.tipologia().nome(), s.colore().nome(), num(d.L()), num(d.H()), s.quantita());
         }
     }
 
@@ -411,8 +483,8 @@ public final class CliView implements View {
         }
         int i = 1;
         for (Avanzo a : avanzi) {
-            System.out.printf(" %2d. %-30s %6s mm x%d%n",
-                    i++, etichetta(a.profilo()), num(a.lunghezza()), a.quantita());
+            System.out.printf(" %2d. %-30s %-10s %6s mm x%d%n",
+                    i++, etichetta(a.profilo()), a.colore().nome(), num(a.lunghezza()), a.quantita());
         }
     }
 
@@ -420,9 +492,9 @@ public final class CliView implements View {
     public void distinta(Distinta distinta) {
         sezione("DISTINTA DI TAGLIO");
         System.out.printf("Totale pezzi da tagliare: %d%n%n", distinta.totalePezzi());
-        distinta.perProfilo().forEach((profilo, pezzi) -> {
-            System.out.printf("%s %-30s (%s): %d pezzi%n",
-                    "-", etichetta(profilo), profilo.categoria(), pezzi.size());
+        distinta.perMateriale().forEach((materiale, pezzi) -> {
+            System.out.printf("%s %-34s (%s): %d pezzi%n",
+                    "-", etichetta(materiale), materiale.profilo().categoria(), pezzi.size());
             System.out.printf("     %s%n", riepilogoPezzi(pezzi));
         });
     }
@@ -436,10 +508,10 @@ public final class CliView implements View {
         System.out.printf("Barre totali: %d  (%d nuove, %d avanzi)  |  media geom. sfrido %s mm%n%n",
                 piano.numeroBarre(), piano.barreNuove(), avanziUsati, num(piano.mediaGeometricaSfrido()));
 
-        piano.perProfilo().forEach((profilo, barre) -> {
+        piano.perMateriale().forEach((materiale, barre) -> {
             long avanzi = barre.stream().filter(BarraTagliata::avanzo).count();
-            System.out.printf("%s %-30s %d barre (%d nuove, %d avanzi)%n",
-                    "-", etichetta(profilo), barre.size(), barre.size() - avanzi, avanzi);
+            System.out.printf("%s %-34s %d barre (%d nuove, %d avanzi)%n",
+                    "-", etichetta(materiale), barre.size(), barre.size() - avanzi, avanzi);
             int i = 1;
             for (BarraTagliata barra : barre) {
                 String tipo = (barra.avanzo() ? "AVANZO " : "NUOVA ") + num(barra.lunghezzaBarra()) + " mm";
@@ -458,32 +530,53 @@ public final class CliView implements View {
     @Override
     public void sfridi(PianoDiTaglio piano) {
         sezione("SFRIDO PER BARRA (dal maggiore al minore)");
-        String riga = "%-30s %-8s %10s%n";
-        System.out.printf(riga, "Profilo", "Barra", "Sfrido");
-        System.out.println("-".repeat(50));
+        String riga = "%-40s %-8s %10s%n";
+        System.out.printf(riga, "Profilo / colore", "Barra", "Sfrido");
+        System.out.println("-".repeat(60));
         piano.barre().stream()
                 .sorted(Comparator.comparingDouble(BarraTagliata::sfrido).reversed())
-                .forEach(barra -> System.out.printf(riga, etichetta(barra.profilo()),
+                .forEach(barra -> System.out.printf(riga, etichetta(barra.materiale()),
                         barra.avanzo() ? "avanzo" : "nuova", num(barra.sfrido()) + " mm"));
     }
 
     @Override
     public void preventivo(Preventivo preventivo) {
         sezione("PREVENTIVO (materiale profili)");
-        String riga = "%-30s %12s %8s %14s %12s%n";
-        System.out.printf(riga, "Profilo", "Barre nuove", "Avanzi", "Lungh. nuova", "Sfrido");
-        System.out.println("-".repeat(80));
+        String riga = "%-30s %-10s %11s %8s %14s %12s%n";
+        System.out.printf(riga, "Profilo", "Colore", "Barre nuove", "Avanzi", "Lungh. nuova", "Sfrido");
+        System.out.println("-".repeat(90));
         for (RigaProfilo r : preventivo.righe()) {
-            System.out.printf(riga, etichetta(r.profilo()), r.barreNuove(), r.avanziUsati(),
-                    num(r.lunghezzaNuova()) + " mm", num(r.sfrido()) + " mm");
+            System.out.printf(riga, etichetta(r.profilo()), r.colore().nome(), r.barreNuove(),
+                    r.avanziUsati(), num(r.lunghezzaNuova()) + " mm", num(r.sfrido()) + " mm");
         }
-        System.out.println("-".repeat(80));
-        System.out.printf(riga, "TOTALE", preventivo.totaleBarreNuove(), preventivo.totaleAvanziUsati(),
+        System.out.println("-".repeat(90));
+        System.out.printf(riga, "TOTALE", "", preventivo.totaleBarreNuove(), preventivo.totaleAvanziUsati(),
                 num(preventivo.lunghezzaNuovaTotale()) + " mm", num(preventivo.sfridoTotale()) + " mm");
 
         System.out.printf("%nMateriale d'acquisto: %d barre da %s mm  =  %s m lineari.%n",
                 preventivo.totaleBarreNuove(), num(Ottimizzatore.BARRA_STANDARD_DEFAULT),
                 num(preventivo.lunghezzaNuovaTotale() / 1000));
+    }
+
+    /**
+     * Il calcolo globale: per ogni ordine il suo piano di taglio e i suoi sfridi, poi il
+     * <b>preventivo totale</b> (il materiale per tutti gli ordini insieme). Lo scarico del
+     * magazzino lo committa e lo conferma il chiamante, non questo render.
+     */
+    @Override
+    public void evasione(EvasioneOrdini evasione) {
+        sezione("CALCOLO GLOBALE - " + conta(evasione.perOrdine().size(), "ordine", "ordini"));
+        for (EvasioneOrdini.RisultatoOrdine risultato : evasione.perOrdine()) {
+            System.out.println();
+            System.out.println(">>> ORDINE: " + risultato.ordine().nome());
+            if (risultato.piano().numeroBarre() == 0) {
+                System.out.println("    (nessun pezzo da tagliare)");
+                continue;
+            }
+            piano(risultato.piano());
+            sfridi(risultato.piano());
+        }
+        preventivo(evasione.preventivoTotale());
     }
 
     // --- Formatter e helper di stampa --------------------------------------------------
@@ -499,6 +592,11 @@ public final class CliView implements View {
     /** Etichetta breve di un profilo: {@code "RX70.101 Telaio"}. */
     private String etichetta(Profilo p) {
         return p.codice() + " " + p.descrizione();
+    }
+
+    /** Etichetta di un materiale: profilo + colore, {@code "RX70.101 Telaio [BIANCO]"}. */
+    private String etichetta(Materiale m) {
+        return etichetta(m.profilo()) + " [" + m.colore().nome() + "]";
     }
 
     /** Numero compatto: senza decimali se intero, altrimenti con una cifra (mm con mezzo taglio). */

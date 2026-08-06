@@ -24,7 +24,7 @@ public class GeneratoreDistinta {
                 double lunghezza = regola.lunghezza(serramento.dimensione());
                 int quantita = regola.quantita() * serramento.quantita();
                 for (int i = 0; i < quantita; i++) {
-                    pezzi.add(new Pezzo(regola.profilo(), lunghezza,
+                    pezzi.add(new Pezzo(regola.profilo(), serramento.colore(), lunghezza,
                             regola.tipoTaglio(), regola.descrizione()));
                 }
             }

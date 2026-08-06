@@ -1,5 +1,6 @@
 package com.cutcalculator.preventivo;
 
+import com.cutcalculator.dominio.Colore;
 import com.cutcalculator.dominio.Profilo;
 
 import java.util.List;
@@ -36,8 +37,10 @@ public record Preventivo(List<RigaProfilo> righe) {
         return righe.stream().mapToDouble(RigaProfilo::sfrido).sum();
     }
 
-    /** La riga di un dato profilo, se presente nel preventivo. */
-    public Optional<RigaProfilo> rigaDi(Profilo profilo) {
-        return righe.stream().filter(riga -> riga.profilo().equals(profilo)).findFirst();
+    /** La riga di un dato profilo in un dato colore, se presente nel preventivo. */
+    public Optional<RigaProfilo> rigaDi(Profilo profilo, Colore colore) {
+        return righe.stream()
+                .filter(riga -> riga.profilo().equals(profilo) && riga.colore().equals(colore))
+                .findFirst();
     }
 }

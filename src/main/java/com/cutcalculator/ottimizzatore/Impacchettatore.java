@@ -1,8 +1,8 @@
 package com.cutcalculator.ottimizzatore;
 
 import com.cutcalculator.dominio.Avanzo;
+import com.cutcalculator.dominio.Materiale;
 import com.cutcalculator.dominio.Pezzo;
-import com.cutcalculator.dominio.Profilo;
 import com.cutcalculator.formule.Distinta;
 
 import java.util.ArrayList;
@@ -73,18 +73,18 @@ final class Impacchettatore {
 
     static PianoDiTaglio impacchetta(Distinta distinta, List<Avanzo> avanzi, double lunghezzaBarraStandard,
             UnaryOperator<List<Pezzo>> ordine, SelettoreBarra selettore) {
-        Map<Profilo, List<Avanzo>> avanziPerProfilo = raggruppaAvanzi(avanzi);
+        Map<Materiale, List<Avanzo>> avanziPerMateriale = raggruppaAvanzi(avanzi);
         List<BarraTagliata> risultato = new ArrayList<>();
 
-        for (Map.Entry<Profilo, List<Pezzo>> gruppo : distinta.perProfilo().entrySet()) {
-            Profilo profilo = gruppo.getKey();
+        for (Map.Entry<Materiale, List<Pezzo>> gruppo : distinta.perMateriale().entrySet()) {
+            Materiale materiale = gruppo.getKey();
             List<Pezzo> pezzi = ordine.apply(new ArrayList<>(gruppo.getValue()));
-            List<BarraTagliata> aperte = daAvanzi(profilo, avanziPerProfilo.get(profilo));
+            List<BarraTagliata> aperte = daAvanzi(materiale, avanziPerMateriale.get(materiale));
 
             for (Pezzo pezzo : pezzi) {
                 BarraTagliata scelta = selettore.scegli(aperte, pezzo);
                 if (scelta == null) {
-                    scelta = apriNuova(profilo, lunghezzaBarraStandard, pezzo);
+                    scelta = apriNuova(materiale, lunghezzaBarraStandard, pezzo);
                     aperte.add(scelta);
                 }
                 scelta.aggiungi(pezzo);
@@ -98,16 +98,16 @@ final class Impacchettatore {
         return new PianoDiTaglio(risultato);
     }
 
-    static Map<Profilo, List<Avanzo>> raggruppaAvanzi(List<Avanzo> avanzi) {
-        Map<Profilo, List<Avanzo>> perProfilo = new LinkedHashMap<>();
+    static Map<Materiale, List<Avanzo>> raggruppaAvanzi(List<Avanzo> avanzi) {
+        Map<Materiale, List<Avanzo>> perMateriale = new LinkedHashMap<>();
         for (Avanzo avanzo : avanzi) {
-            perProfilo.computeIfAbsent(avanzo.profilo(), p -> new ArrayList<>()).add(avanzo);
+            perMateriale.computeIfAbsent(avanzo.materiale(), m -> new ArrayList<>()).add(avanzo);
         }
-        return perProfilo;
+        return perMateriale;
     }
 
-    /** Espande gli avanzi di un profilo (dal più corto) in barre vuote riusabili. */
-    static List<BarraTagliata> daAvanzi(Profilo profilo, List<Avanzo> avanzi) {
+    /** Espande gli avanzi di un materiale (dal più corto) in barre vuote riusabili. */
+    static List<BarraTagliata> daAvanzi(Materiale materiale, List<Avanzo> avanzi) {
         List<BarraTagliata> barre = new ArrayList<>();
         if (avanzi == null) {
             return barre;
@@ -116,19 +116,19 @@ final class Impacchettatore {
         ordinati.sort(Comparator.comparingDouble(Avanzo::lunghezza));
         for (Avanzo avanzo : ordinati) {
             for (int i = 0; i < avanzo.quantita(); i++) {
-                barre.add(new BarraTagliata(profilo, avanzo.lunghezza(), true));
+                barre.add(new BarraTagliata(materiale.profilo(), materiale.colore(), avanzo.lunghezza(), true));
             }
         }
         return barre;
     }
 
     /** Apre una barra nuova; se il pezzo non ci sta nemmeno lì, è fisicamente impossibile. */
-    static BarraTagliata apriNuova(Profilo profilo, double lunghezzaBarraStandard, Pezzo pezzo) {
-        BarraTagliata nuova = new BarraTagliata(profilo, lunghezzaBarraStandard, false);
+    static BarraTagliata apriNuova(Materiale materiale, double lunghezzaBarraStandard, Pezzo pezzo) {
+        BarraTagliata nuova = new BarraTagliata(materiale.profilo(), materiale.colore(), lunghezzaBarraStandard, false);
         if (!nuova.entra(pezzo)) {
             throw new IllegalArgumentException("Pezzo da " + pezzo.lunghezza()
                     + " mm troppo lungo per la barra standard da " + lunghezzaBarraStandard
-                    + " mm (profilo " + profilo.codice() + ")");
+                    + " mm (profilo " + materiale.profilo().codice() + " " + materiale.colore().nome() + ")");
         }
         return nuova;
     }

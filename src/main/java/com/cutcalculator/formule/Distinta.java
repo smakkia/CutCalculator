@@ -1,7 +1,7 @@
 package com.cutcalculator.formule;
 
+import com.cutcalculator.dominio.Materiale;
 import com.cutcalculator.dominio.Pezzo;
-import com.cutcalculator.dominio.Profilo;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -11,9 +11,9 @@ import java.util.stream.Collectors;
 /**
  * L'output della Fase 1: tutti i pezzi da tagliare per un ordine.
  * <p>
- * Oltre alla lista piatta offre il raggruppamento per profilo, che serve
- * all'ottimizzatore: un pezzo può essere ricavato solo da una barra del suo
- * stesso profilo.
+ * Oltre alla lista piatta offre il raggruppamento per {@link Materiale} (profilo + colore),
+ * che serve all'ottimizzatore: un pezzo può essere ricavato solo da una barra dello stesso
+ * profilo <b>e</b> colore.
  */
 public record Distinta(List<Pezzo> pezzi) {
 
@@ -27,9 +27,9 @@ public record Distinta(List<Pezzo> pezzi) {
         return pezzi.size();
     }
 
-    /** Pezzi raggruppati per profilo, nell'ordine in cui compaiono. */
-    public Map<Profilo, List<Pezzo>> perProfilo() {
+    /** Pezzi raggruppati per {@link Materiale} (profilo + colore), nell'ordine in cui compaiono. */
+    public Map<Materiale, List<Pezzo>> perMateriale() {
         return pezzi.stream().collect(Collectors.groupingBy(
-                Pezzo::profilo, LinkedHashMap::new, Collectors.toList()));
+                Pezzo::materiale, LinkedHashMap::new, Collectors.toList()));
     }
 }

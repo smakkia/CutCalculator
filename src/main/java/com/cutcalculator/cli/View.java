@@ -5,6 +5,7 @@ import com.cutcalculator.dominio.Avanzo;
 import com.cutcalculator.dominio.Ordine;
 import com.cutcalculator.formule.Distinta;
 import com.cutcalculator.ottimizzatore.PianoDiTaglio;
+import com.cutcalculator.pianificazione.EvasioneOrdini;
 import com.cutcalculator.preventivo.Preventivo;
 
 import java.util.List;
@@ -39,4 +40,6 @@ public interface View {
     void sfridi(PianoDiTaglio piano);
 
     void preventivo(Preventivo preventivo);
+
+    void evasione(EvasioneOrdini evasione);
 }

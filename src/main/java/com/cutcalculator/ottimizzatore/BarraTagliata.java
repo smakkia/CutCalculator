@@ -1,5 +1,7 @@
 package com.cutcalculator.ottimizzatore;
 
+import com.cutcalculator.dominio.Colore;
+import com.cutcalculator.dominio.Materiale;
 import com.cutcalculator.dominio.Pezzo;
 import com.cutcalculator.dominio.Profilo;
 
@@ -10,9 +12,10 @@ import java.util.List;
  * Una singola barra grezza presa a magazzino, con i pezzi già tagliati dentro.
  * È l'unità che l'ottimizzatore riempie, un pezzo alla volta, finché c'è spazio.
  * <p>
- * Una barra appartiene a <b>un solo profilo</b>: da lei si possono ricavare solo
- * pezzi di quel profilo (un telaio non esce da una barra d'anta). È <b>mutabile</b>,
- * perché l'ottimizzatore ci aggiunge pezzi progressivamente.
+ * Una barra appartiene a <b>un solo {@link Materiale}</b> (profilo + colore): da lei si possono
+ * ricavare solo pezzi dello stesso profilo e colore (un telaio bianco non esce da una barra d'anta,
+ * né da una barra bronzo). È <b>mutabile</b>, perché l'ottimizzatore ci aggiunge pezzi
+ * progressivamente.
  * <p>
  * Può essere un <b>avanzo</b> già in magazzino (gratis, di proprietà) oppure una
  * <b>barra nuova</b> da comprare: lo dice il flag {@link #avanzo()}. Il preventivo
@@ -31,12 +34,14 @@ public class BarraTagliata {
     private static final double EPS = 1e-9;
 
     private final Profilo profilo;
+    private final Colore colore;
     private final double lunghezzaBarra;
     private final boolean avanzo;
     private final List<Pezzo> pezzi = new ArrayList<>();
 
-    public BarraTagliata(Profilo profilo, double lunghezzaBarra, boolean avanzo) {
+    public BarraTagliata(Profilo profilo, Colore colore, double lunghezzaBarra, boolean avanzo) {
         this.profilo = profilo;
+        this.colore = colore;
         this.lunghezzaBarra = lunghezzaBarra;
         this.avanzo = avanzo;
     }
@@ -62,14 +67,14 @@ public class BarraTagliata {
     /**
      * Colloca il pezzo sulla barra.
      *
-     * @throws IllegalArgumentException se il pezzo è di un profilo diverso (codice diverso)
+     * @throws IllegalArgumentException se il pezzo è di un materiale diverso (profilo o colore)
      * @throws IllegalStateException    se il pezzo non ci sta (chiama prima {@link #entra})
      */
     public void aggiungi(Pezzo pezzo) {
-        if (!pezzo.profilo().codice().equals(profilo.codice())) {
+        if (!pezzo.materiale().equals(materiale())) {
             throw new IllegalArgumentException(
-                    "Pezzo del profilo " + pezzo.profilo().codice()
-                            + " non collocabile su una barra del profilo " + profilo.codice());
+                    "Pezzo " + pezzo.profilo().codice() + " " + pezzo.colore().nome()
+                            + " non collocabile su una barra " + profilo.codice() + " " + colore.nome());
         }
         if (!entra(pezzo)) {
             throw new IllegalStateException(
@@ -81,6 +86,15 @@ public class BarraTagliata {
 
     public Profilo profilo() {
         return profilo;
+    }
+
+    public Colore colore() {
+        return colore;
+    }
+
+    /** Il {@link Materiale} (profilo + colore) di questa barra: la chiave con cui la si raggruppa. */
+    public Materiale materiale() {
+        return new Materiale(profilo, colore);
     }
 
     public double lunghezzaBarra() {

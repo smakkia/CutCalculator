@@ -11,6 +11,9 @@ import java.util.List;
  * l'utente compila e corregge: si può aggiungere, togliere o sostituire un singolo
  * serramento senza rifare l'ordine. I {@link Serramento} restano immutabili, quindi
  * "modificarne uno" significa sostituirlo con la versione corretta.
+ * <p>
+ * Un ordine può contenere serramenti di <b>colori diversi</b>: il colore è un attributo del singolo
+ * {@link Serramento} (tutti i pezzi di quel serramento sono di quel colore), non dell'ordine.
  */
 public class Ordine {
 
@@ -49,5 +52,10 @@ public class Ordine {
     /** Vista in sola lettura dei serramenti; le modifiche passano dai metodi sopra. */
     public List<Serramento> serramenti() {
         return List.copyOf(serramenti);
+    }
+
+    /** Numero totale di serramenti richiesti: la somma delle quantità di ogni riga. */
+    public int totaleSerramenti() {
+        return serramenti.stream().mapToInt(Serramento::quantita).sum();
     }
 }
