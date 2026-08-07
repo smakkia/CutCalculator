@@ -27,8 +27,8 @@ import java.util.List;
  */
 public class BarraTagliata {
 
-    /** Spessore della lama a ogni taglio, in mm. */
-    private static final double KERF = 4.0;
+    /** Spessore della lama a ogni taglio, in mm: ogni pezzo "costa" la sua lunghezza piu' questo. */
+    public static final double KERF = 4.0;
 
     /** Tolleranza per i confronti tra double (le lunghezze sono in mm). */
     private static final double EPS = 1e-9;

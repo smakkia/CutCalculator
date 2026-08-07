@@ -37,6 +37,21 @@ public record Preventivo(List<RigaProfilo> righe) {
         return righe.stream().mapToDouble(RigaProfilo::sfrido).sum();
     }
 
+    /** Quanti ritagli sopra soglia rientreranno in magazzino come nuovi avanzi. */
+    public int totaleRitagliRecuperabili() {
+        return righe.stream().mapToInt(RigaProfilo::ritagliRecuperabili).sum();
+    }
+
+    /** Lunghezza totale dei ritagli recuperabili: la parte di sfrido che non va persa. */
+    public double lunghezzaRecuperabileTotale() {
+        return righe.stream().mapToDouble(RigaProfilo::lunghezzaRecuperabile).sum();
+    }
+
+    /** Lo sfrido che resta scarto vero: troppo corto per tornare a magazzino. */
+    public double scartoTotale() {
+        return sfridoTotale() - lunghezzaRecuperabileTotale();
+    }
+
     /** La riga di un dato profilo in un dato colore, se presente nel preventivo. */
     public Optional<RigaProfilo> rigaDi(Profilo profilo, Colore colore) {
         return righe.stream()

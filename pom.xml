@@ -13,6 +13,7 @@
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <junit.version>5.11.3</junit.version>
+        <javafx.version>25.0.1</javafx.version>
     </properties>
 
     <dependencies>
@@ -21,6 +22,18 @@
             <artifactId>junit-jupiter</artifactId>
             <version>${junit.version}</version>
             <scope>test</scope>
+        </dependency>
+        <!-- GUI: JavaFX non fa piu' parte del JDK, va tirato dentro come dipendenza.
+             Il classifier per la piattaforma lo sceglie il POM di OpenJFX da solo. -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>${javafx.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-fxml</artifactId>
+            <version>${javafx.version}</version>
         </dependency>
     </dependencies>
 
@@ -43,6 +56,15 @@
                 <version>3.5.0</version>
                 <configuration>
                     <mainClass>com.cutcalculator.cli.CliApp</mainClass>
+                </configuration>
+            </plugin>
+            <!-- Client grafico JavaFX:  mvn javafx:run -->
+            <plugin>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-maven-plugin</artifactId>
+                <version>0.0.8</version>
+                <configuration>
+                    <mainClass>com.cutcalculator.gui.GuiApp</mainClass>
                 </configuration>
             </plugin>
         </plugins>

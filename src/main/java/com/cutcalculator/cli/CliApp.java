@@ -1,6 +1,9 @@
 package com.cutcalculator.cli;
 
+import com.cutcalculator.app.Controller;
+import com.cutcalculator.app.View;
 import com.cutcalculator.catalogo.Catalogo;
+import com.cutcalculator.persistenza.ArchivioImpostazioni;
 import com.cutcalculator.persistenza.ArchivioMagazzino;
 import com.cutcalculator.persistenza.ArchivioOrdini;
 
@@ -20,6 +23,7 @@ public final class CliApp {
 
     private static final Path FILE_MAGAZZINO = Path.of("dati", "magazzino.csv");
     private static final Path FILE_ORDINI = Path.of("dati", "ordini.csv");
+    private static final Path FILE_IMPOSTAZIONI = Path.of("dati", "impostazioni.properties");
 
     private CliApp() {
     }
@@ -28,7 +32,8 @@ public final class CliApp {
         Catalogo catalogo = Catalogo.completo();
         ArchivioMagazzino archivio = new ArchivioMagazzino(FILE_MAGAZZINO, catalogo);
         ArchivioOrdini archivioOrdini = new ArchivioOrdini(FILE_ORDINI, catalogo);
+        ArchivioImpostazioni impostazioni = new ArchivioImpostazioni(FILE_IMPOSTAZIONI);
         View view = new CliView(new Scanner(System.in));
-        view.avvia(new Controller(catalogo, archivio, archivioOrdini));
+        view.avvia(new Controller(catalogo, archivio, archivioOrdini, impostazioni));
     }
 }

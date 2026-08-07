@@ -39,7 +39,7 @@ import java.util.Map;
 public final class PianificatoreOrdini {
 
     /** Lunghezza minima (mm) perché un residuo di taglio valga come nuovo avanzo riusabile. */
-    public static final double SOGLIA_RITAGLIO_DEFAULT = 500.0;
+    public static final double SOGLIA_RITAGLIO_DEFAULT = Avanzo.LUNGHEZZA_MINIMA_RIUSO;
 
     private final GeneratoreDistinta generatoreDistinta = new GeneratoreDistinta();
     private final Ottimizzatore ottimizzatore = new BestFitDecreasing();

@@ -1,5 +1,7 @@
 package com.cutcalculator.catalogo;
 
+import com.cutcalculator.dominio.Tipologia;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -40,5 +42,14 @@ public class Catalogo {
     /** Il sistema con questo nome, se presente nel catalogo. */
     public Optional<Sistema> sistema(String nome) {
         return sistemi.stream().filter(s -> s.nome().equals(nome)).findFirst();
+    }
+
+    /**
+     * Il sistema a cui appartiene una tipologia: serve a risalire dalla ricetta alla serie
+     * commerciale (per mostrarla o per salvarla su file), visto che la {@link Tipologia} non
+     * conosce il proprio sistema.
+     */
+    public Optional<Sistema> sistemaDi(Tipologia tipologia) {
+        return sistemi.stream().filter(s -> s.tipologie().contains(tipologia)).findFirst();
     }
 }

@@ -1,5 +1,9 @@
 package com.cutcalculator.cli;
 
+import com.cutcalculator.app.Controller;
+import com.cutcalculator.app.Etichette;
+import com.cutcalculator.app.Unita;
+import com.cutcalculator.app.View;
 import com.cutcalculator.catalogo.Catalogo;
 import com.cutcalculator.catalogo.Sistema;
 import com.cutcalculator.dominio.Avanzo;
@@ -9,7 +13,6 @@ import com.cutcalculator.dominio.Materiale;
 import com.cutcalculator.dominio.Ordine;
 import com.cutcalculator.dominio.Pezzo;
 import com.cutcalculator.dominio.Profilo;
-import com.cutcalculator.dominio.RegolaTaglio;
 import com.cutcalculator.dominio.Serramento;
 import com.cutcalculator.dominio.Tipologia;
 import com.cutcalculator.dominio.TipoTaglio;
@@ -23,7 +26,6 @@ import com.cutcalculator.preventivo.RigaProfilo;
 
 import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Scanner;
@@ -74,15 +76,27 @@ public final class CliView implements View {
         System.out.println("=== MENU PRINCIPALE ===");
         System.out.println("  1) Magazzino  (" + conta(controller.totaleAvanzi(), "pezzo", "pezzi") + ")");
         System.out.println("  2) Ordini     (" + conta(controller.ordini().size(), "ordine", "ordini") + ")");
+        System.out.println("  3) Unita' di misura  (" + controller.unita().descrizione() + ")");
         System.out.println("  0) Esci");
-        switch (leggiIntero("Scelta", 0, 2)) {
+        switch (leggiIntero("Scelta", 0, 3)) {
             case 1 -> menuMagazzino();
             case 2 -> menuOrdini();
+            case 3 -> scegliUnita();
             case 0 -> {
                 return false;
             }
         }
         return true;
+    }
+
+    /**
+     * Cambia l'unita' con cui misure e sfridi vengono mostrati <b>e</b> letti. I dati non si
+     * toccano: il modello resta in millimetri, cambia solo la lente.
+     */
+    private void scegliUnita() {
+        Unita scelta = scegliDaLista("Unita' di misura:", List.of(Unita.values()), Unita::descrizione);
+        controller.impostaUnita(scelta);
+        System.out.println("  Misure in " + scelta.descrizione() + ".");
     }
 
     // --- Sezione MAGAZZINO -------------------------------------------------------------
@@ -110,13 +124,13 @@ public final class CliView implements View {
     private void aggiungiAvanzo() {
         Sistema sistema = scegliSistema();
         Profilo profilo = scegliDaLista(
-                "Profili di " + sistema.nome() + ":", profiliDi(sistema), this::etichetta);
+                "Profili di " + sistema.nome() + ":", sistema.profili(), this::etichetta);
         Colore colore = leggiColore("Colore");
         double lunghezza = leggiMisura("Lunghezza pezzo");
         int quantita = leggiQuantita("Quantita'");
         controller.aggiungiAvanzo(new Avanzo(profilo, colore, lunghezza, quantita));
-        System.out.printf("  + pezzo %s [%s]  %s mm  x%d%n",
-                etichetta(profilo), colore.nome(), num(lunghezza), quantita);
+        System.out.printf("  + pezzo %s [%s]  %s  x%d%n",
+                etichetta(profilo), colore.nome(), mis(lunghezza), quantita);
     }
 
     private void mostraMagazzino() {
@@ -144,11 +158,11 @@ public final class CliView implements View {
                 : leggiIntero("Quanti toglierne", 1, avanzo.quantita());
         Avanzo rimasto = controller.rimuoviAvanzo(scelta - 1, quantita);
         if (rimasto == null) {
-            System.out.printf("  Rimosso: %s [%s]  %s mm x%d%n",
-                    etichetta(avanzo.profilo()), avanzo.colore().nome(), num(avanzo.lunghezza()), quantita);
+            System.out.printf("  Rimosso: %s [%s]  %s x%d%n",
+                    etichetta(avanzo.profilo()), avanzo.colore().nome(), mis(avanzo.lunghezza()), quantita);
         } else {
-            System.out.printf("  Tolti x%d: %s [%s]  %s mm  (restano x%d)%n", quantita,
-                    etichetta(rimasto.profilo()), rimasto.colore().nome(), num(rimasto.lunghezza()), rimasto.quantita());
+            System.out.printf("  Tolti x%d: %s [%s]  %s  (restano x%d)%n", quantita,
+                    etichetta(rimasto.profilo()), rimasto.colore().nome(), mis(rimasto.lunghezza()), rimasto.quantita());
         }
     }
 
@@ -257,7 +271,7 @@ public final class CliView implements View {
             return;
         }
         System.out.printf("  Il calcolo globale scarica il magazzino: gli avanzi usati vengono consumati e"
-                + " i ritagli >= %s mm rientrano. L'operazione salva su disco.%n", num(controller.sogliaRitaglio()));
+                + " i ritagli >= %s rientrano. L'operazione salva su disco.%n", mis(controller.sogliaRitaglio()));
         if (!prompt("  Confermi? [s/N]> ").trim().equalsIgnoreCase("s")) {
             System.out.println("  Annullato: magazzino invariato.");
             return;
@@ -334,9 +348,9 @@ public final class CliView implements View {
         double hf = tipologia.usaHF() ? leggiMisura("Altezza parziale HF") : 0;
         int quantita = leggiQuantita("Quantita'");
         ordine.aggiungi(new Serramento(tipologia, colore, new Dimensione(l, h, hf), quantita));
-        System.out.printf("  + %s / %s [%s]  %s x %s%s mm  x%d%n",
-                sistema.nome(), tipologia.nome(), colore.nome(), num(l), num(h),
-                hf > 0 ? " (HF " + num(hf) + ")" : "", quantita);
+        System.out.printf("  + %s / %s [%s]  %s x %s %s%s  x%d%n",
+                sistema.nome(), tipologia.nome(), colore.nome(), num(l), num(h), simbolo(),
+                hf > 0 ? " (HF " + mis(hf) + ")" : "", quantita);
     }
 
     private void rimuoviSerramento(Ordine ordine) {
@@ -385,15 +399,6 @@ public final class CliView implements View {
     private Sistema scegliSistema() {
         return scegliDaLista("Sistemi disponibili:", controller.catalogo().sistemi(),
                 s -> s.nome() + " (" + s.famiglia() + ")");
-    }
-
-    /** I profili distinti di un sistema, presi dalle regole di tutte le sue tipologie. */
-    private static List<Profilo> profiliDi(Sistema sistema) {
-        return sistema.tipologie().stream()
-                .flatMap(t -> t.regole().stream())
-                .map(RegolaTaglio::profilo)
-                .distinct()
-                .toList();
     }
 
     private <T> T scegliDaLista(String titolo, List<T> opzioni, Function<T, String> etichetta) {
@@ -466,20 +471,29 @@ public final class CliView implements View {
         }
     }
 
-    /** Legge una misura in mm; accetta sia la virgola sia il punto come separatore decimale. */
+    /**
+     * Legge una misura nell'unita' scelta dall'utente e la restituisce <b>in mm</b> (il modello
+     * lavora sempre in millimetri). Accetta sia la virgola sia il punto come separatore decimale.
+     */
     private double leggiMisura(String etichetta) {
         while (true) {
-            String riga = prompt(etichetta + " (mm)> ").trim().replace(',', '.');
+            String riga = prompt(etichetta + " (" + simbolo() + ")> ").trim().replace(',', '.');
             try {
                 double valore = Double.parseDouble(riga);
                 if (valore > 0) {
-                    return valore;
+                    return controller.unita().versoMm(valore);
                 }
             } catch (NumberFormatException ignored) {
                 // ricade nel messaggio sotto
             }
-            System.out.println("  Inserisci una misura positiva in mm (es. 1500 o 1476,5).");
+            System.out.println("  Inserisci una misura positiva in " + simbolo()
+                    + " (es. " + esempioMisura() + ").");
         }
+    }
+
+    /** Un esempio di misura sensato nell'unita' corrente, per il messaggio d'errore. */
+    private String esempioMisura() {
+        return num(1500) + " o " + num(1476.5);
     }
 
     /** Stampa il prompt e legge una riga; {@link NoSuchElementException} a fine input = uscita. */
@@ -521,8 +535,9 @@ public final class CliView implements View {
         int i = 1;
         for (Serramento s : ordine.serramenti()) {
             Dimensione d = s.dimensione();
-            System.out.printf(" %2d. %-32s %-10s %6s x %-6s mm   x%d%n",
-                    i++, s.tipologia().nome(), s.colore().nome(), num(d.L()), num(d.H()), s.quantita());
+            System.out.printf(" %2d. %-32s %-10s %8s x %-8s %-2s   x%d%n",
+                    i++, s.tipologia().nome(), s.colore().nome(),
+                    num(d.L()), num(d.H()), simbolo(), s.quantita());
         }
     }
 
@@ -536,8 +551,8 @@ public final class CliView implements View {
         }
         int i = 1;
         for (Avanzo a : avanzi) {
-            System.out.printf(" %2d. %-30s %-10s %6s mm x%d%n",
-                    i++, etichetta(a.profilo()), a.colore().nome(), num(a.lunghezza()), a.quantita());
+            System.out.printf(" %2d. %-30s %-10s %10s x%d%n",
+                    i++, etichetta(a.profilo()), a.colore().nome(), mis(a.lunghezza()), a.quantita());
         }
     }
 
@@ -556,10 +571,10 @@ public final class CliView implements View {
     public void piano(PianoDiTaglio piano) {
         sezione("PIANO DI TAGLIO");
         int avanziUsati = piano.numeroBarre() - piano.barreNuove();
-        System.out.printf("Barra standard: %s mm  |  kerf 4 mm/taglio%n",
-                num(Ottimizzatore.BARRA_STANDARD_DEFAULT));
-        System.out.printf("Barre totali: %d  (%d nuove, %d avanzi)  |  media geom. sfrido %s mm%n%n",
-                piano.numeroBarre(), piano.barreNuove(), avanziUsati, num(piano.mediaGeometricaSfrido()));
+        System.out.printf("Barra standard: %s  |  kerf %s/taglio%n",
+                mis(Ottimizzatore.BARRA_STANDARD_DEFAULT), mis(BarraTagliata.KERF));
+        System.out.printf("Barre totali: %d  (%d nuove, %d avanzi)  |  media geom. sfrido %s%n%n",
+                piano.numeroBarre(), piano.barreNuove(), avanziUsati, mis(piano.mediaGeometricaSfrido()));
 
         piano.perMateriale().forEach((materiale, barre) -> {
             long avanzi = barre.stream().filter(BarraTagliata::avanzo).count();
@@ -567,9 +582,9 @@ public final class CliView implements View {
                     "-", etichetta(materiale), barre.size(), barre.size() - avanzi, avanzi);
             int i = 1;
             for (BarraTagliata barra : barre) {
-                String tipo = (barra.avanzo() ? "AVANZO " : "NUOVA ") + num(barra.lunghezzaBarra()) + " mm";
-                System.out.printf("    #%-2d [%-14s]  occupato %6s mm  |  sfrido %6s mm%n",
-                        i++, tipo, num(barra.occupato()), num(barra.sfrido()));
+                String tipo = (barra.avanzo() ? "AVANZO " : "NUOVA ") + mis(barra.lunghezzaBarra());
+                System.out.printf("    #%-2d [%-16s]  occupato %9s  |  sfrido %9s%n",
+                        i++, tipo, mis(barra.occupato()), mis(barra.sfrido()));
                 System.out.printf("        -> %s%n", riepilogoPezzi(barra.pezzi()));
             }
             System.out.println();
@@ -583,32 +598,41 @@ public final class CliView implements View {
     @Override
     public void sfridi(PianoDiTaglio piano) {
         sezione("SFRIDO PER BARRA (dal maggiore al minore)");
-        String riga = "%-40s %-8s %10s%n";
-        System.out.printf(riga, "Profilo / colore", "Barra", "Sfrido");
-        System.out.println("-".repeat(60));
+        String riga = "%-40s %-8s %12s %s%n";
+        System.out.printf(riga, "Profilo / colore", "Barra", "Sfrido", "");
+        System.out.println("-".repeat(72));
         piano.barre().stream()
                 .sorted(Comparator.comparingDouble(BarraTagliata::sfrido).reversed())
                 .forEach(barra -> System.out.printf(riga, etichetta(barra.materiale()),
-                        barra.avanzo() ? "avanzo" : "nuova", num(barra.sfrido()) + " mm"));
+                        barra.avanzo() ? "avanzo" : "nuova", mis(barra.sfrido()),
+                        barra.sfrido() >= controller.sogliaRitaglio() ? "-> torna a magazzino" : ""));
     }
 
     @Override
     public void preventivo(Preventivo preventivo) {
-        sezione("PREVENTIVO (materiale profili)");
-        String riga = "%-30s %-10s %11s %8s %14s %12s%n";
-        System.out.printf(riga, "Profilo", "Colore", "Barre nuove", "Avanzi", "Lungh. nuova", "Sfrido");
-        System.out.println("-".repeat(90));
+        sezione("PREVENTIVO (materiale profili)  -  misure in " + simbolo());
+        String riga = "%-28s %-10s %11s %7s %13s %11s %8s %13s%n";
+        System.out.printf(riga, "Profilo", "Colore", "Barre nuove", "Avanzi", "Lungh. nuova",
+                "Sfrido", "Ritagli", "Da riusare");
+        System.out.println("-".repeat(107));
         for (RigaProfilo r : preventivo.righe()) {
-            System.out.printf(riga, etichetta(r.profilo()), r.colore().nome(), r.barreNuove(),
-                    r.avanziUsati(), num(r.lunghezzaNuova()) + " mm", num(r.sfrido()) + " mm");
+            System.out.printf(riga, tronca(etichetta(r.profilo()), 28), r.colore().nome(), r.barreNuove(),
+                    r.avanziUsati(), num(r.lunghezzaNuova()), num(r.sfrido()),
+                    r.ritagliRecuperabili(), num(r.lunghezzaRecuperabile()));
         }
-        System.out.println("-".repeat(90));
+        System.out.println("-".repeat(107));
         System.out.printf(riga, "TOTALE", "", preventivo.totaleBarreNuove(), preventivo.totaleAvanziUsati(),
-                num(preventivo.lunghezzaNuovaTotale()) + " mm", num(preventivo.sfridoTotale()) + " mm");
+                num(preventivo.lunghezzaNuovaTotale()), num(preventivo.sfridoTotale()),
+                preventivo.totaleRitagliRecuperabili(), num(preventivo.lunghezzaRecuperabileTotale()));
 
-        System.out.printf("%nMateriale d'acquisto: %d barre da %s mm  =  %s m lineari.%n",
-                preventivo.totaleBarreNuove(), num(Ottimizzatore.BARRA_STANDARD_DEFAULT),
-                num(preventivo.lunghezzaNuovaTotale() / 1000));
+        System.out.printf("%nMateriale d'acquisto: %d barre da %s  =  %s lineari.%n",
+                preventivo.totaleBarreNuove(), mis(Ottimizzatore.BARRA_STANDARD_DEFAULT),
+                mis(preventivo.lunghezzaNuovaTotale()));
+        System.out.printf("Torneranno a magazzino %s (>= %s), per un totale di %s;"
+                        + " scarto effettivo %s.%n",
+                conta(preventivo.totaleRitagliRecuperabili(), "ritaglio", "ritagli"),
+                mis(controller.sogliaRitaglio()), mis(preventivo.lunghezzaRecuperabileTotale()),
+                mis(preventivo.scartoTotale()));
     }
 
     /**
@@ -642,21 +666,35 @@ public final class CliView implements View {
         System.out.println(linea);
     }
 
-    /** Etichetta breve di un profilo: {@code "RX70.101 Telaio"}. */
+    // Scorciatoie sulle etichette condivise con la GUI (vedi Etichette): qui restano solo
+    // perche' compaiono in decine di printf, la formattazione vera sta in un posto solo.
+
     private String etichetta(Profilo p) {
-        return p.codice() + " " + p.descrizione();
+        return Etichette.profilo(p);
     }
 
-    /** Etichetta di un materiale: profilo + colore, {@code "RX70.101 Telaio [BIANCO]"}. */
     private String etichetta(Materiale m) {
-        return etichetta(m.profilo()) + " [" + m.colore().nome() + "]";
+        return Etichette.materiale(m);
     }
 
-    /** Numero compatto: senza decimali se intero, altrimenti con una cifra (mm con mezzo taglio). */
+    /** Una misura (sempre mm nel modello) nell'unita' scelta dall'utente, senza simbolo. */
     private String num(double v) {
-        return Math.rint(v) == v
-                ? String.format(Locale.ROOT, "%.0f", v)
-                : String.format(Locale.ROOT, "%.1f", v);
+        return Etichette.misura(v, controller.unita());
+    }
+
+    /** Una misura con il simbolo dell'unita' scelta: {@code "6.5 m"}. */
+    private String mis(double v) {
+        return Etichette.misuraConSimbolo(v, controller.unita());
+    }
+
+    /** Il simbolo dell'unita' corrente, per le intestazioni e i prompt. */
+    private String simbolo() {
+        return controller.unita().simbolo();
+    }
+
+    /** Accorcia un'etichetta troppo lunga per la sua colonna, cosi' la tabella resta allineata. */
+    private static String tronca(String testo, int larghezza) {
+        return testo.length() <= larghezza ? testo : testo.substring(0, larghezza - 1) + ".";
     }
 
     /**
@@ -678,13 +716,7 @@ public final class CliView implements View {
                 .collect(Collectors.joining("  |  "));
     }
 
-    /** Etichetta compatta dei due tagli alle estremita' di un pezzo. */
     private static String etichettaTaglio(TipoTaglio taglio) {
-        return switch (taglio) {
-            case TAGLIO_45_45 -> "45/45";
-            case TAGLIO_90_90 -> "90/90";
-            case TAGLIO_90_45_DX -> "90/45 DX";
-            case TAGLIO_90_45_SX -> "90/45 SX";
-        };
+        return Etichette.taglio(taglio);
     }
 }

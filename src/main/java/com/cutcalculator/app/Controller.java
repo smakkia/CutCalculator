@@ -1,4 +1,4 @@
-package com.cutcalculator.cli;
+package com.cutcalculator.app;
 
 import com.cutcalculator.catalogo.Catalogo;
 import com.cutcalculator.dominio.Avanzo;
@@ -7,6 +7,7 @@ import com.cutcalculator.formule.Distinta;
 import com.cutcalculator.formule.GeneratoreDistinta;
 import com.cutcalculator.ottimizzatore.BestFitDecreasing;
 import com.cutcalculator.ottimizzatore.PianoDiTaglio;
+import com.cutcalculator.persistenza.ArchivioImpostazioni;
 import com.cutcalculator.persistenza.ArchivioMagazzino;
 import com.cutcalculator.persistenza.ArchivioOrdini;
 import com.cutcalculator.pianificazione.EvasioneOrdini;
@@ -23,7 +24,7 @@ import java.util.List;
  * {@link Avanzo avanzi} e la lista degli {@link Ordine ordini}, ed espone le azioni per
  * modificarli e per far scorrere la pipeline ({@link #calcola}).
  * <p>
- * Una view — oggi {@link CliView}, domani una GUI — ci si appoggia sopra: legge lo stato e
+ * Una view — oggi {@code CliView}, domani {@code GuiFx} — ci si appoggia sopra: legge lo stato e
  * invoca le operazioni, senza duplicarne la gestione. Il magazzino è condiviso da tutti gli
  * ordini; {@link #calcola} riusa gli avanzi correnti senza consumarli.
  */
@@ -32,31 +33,62 @@ public final class Controller {
     private final Catalogo catalogo;
     private final ArchivioMagazzino archivio;
     private final ArchivioOrdini archivioOrdini;
+    private final ArchivioImpostazioni archivioImpostazioni;
     private final List<Avanzo> magazzino = new ArrayList<>();
     private final List<Ordine> ordini = new ArrayList<>();
+    private Unita unita = Unita.PREDEFINITA;
 
     /** Solo in memoria, senza persistenza: comodo per test o usi effimeri. */
     public Controller(Catalogo catalogo) {
-        this(catalogo, null, null);
+        this(catalogo, null, null, null);
     }
 
     /** Con la sola persistenza del magazzino (gli ordini restano in memoria). */
     public Controller(Catalogo catalogo, ArchivioMagazzino archivio) {
-        this(catalogo, archivio, null);
+        this(catalogo, archivio, null, null);
+    }
+
+    /** Magazzino e ordini su disco, impostazioni solo in memoria. */
+    public Controller(Catalogo catalogo, ArchivioMagazzino archivio, ArchivioOrdini archivioOrdini) {
+        this(catalogo, archivio, archivioOrdini, null);
     }
 
     /**
      * Collega gli archivi su disco. Il <b>magazzino</b> viene caricato all'avvio e risalvato a ogni
      * modifica ({@code archivio}). Gli <b>ordini</b> non si caricano da soli: il salvataggio e il
-     * caricamento sono <b>su comando</b> ({@link #salvaOrdini()} / {@link #caricaOrdini()}). Con un
-     * archivio null la rispettiva persistenza è disattivata (tutto resta in memoria).
+     * caricamento sono <b>su comando</b> ({@link #salvaOrdini()} / {@link #caricaOrdini()}). Le
+     * <b>impostazioni</b> (oggi la sola {@link Unita unità di misura}) si caricano all'avvio e si
+     * salvano a ogni cambio. Con un archivio null la rispettiva persistenza è disattivata.
      */
-    public Controller(Catalogo catalogo, ArchivioMagazzino archivio, ArchivioOrdini archivioOrdini) {
+    public Controller(Catalogo catalogo, ArchivioMagazzino archivio, ArchivioOrdini archivioOrdini,
+            ArchivioImpostazioni archivioImpostazioni) {
         this.catalogo = catalogo;
         this.archivio = archivio;
         this.archivioOrdini = archivioOrdini;
+        this.archivioImpostazioni = archivioImpostazioni;
         if (archivio != null) {
             magazzino.addAll(archivio.carica());
+        }
+        if (archivioImpostazioni != null) {
+            unita = archivioImpostazioni.caricaUnita();
+        }
+    }
+
+    // --- Impostazioni ------------------------------------------------------------------
+
+    /**
+     * L'unità con cui la UI mostra e legge le misure. Il modello resta sempre in millimetri:
+     * questa è solo la lente con cui l'utente ci guarda attraverso.
+     */
+    public Unita unita() {
+        return unita;
+    }
+
+    /** Cambia l'unità di misura e la persiste, se c'è un archivio impostazioni collegato. */
+    public void impostaUnita(Unita unita) {
+        this.unita = unita;
+        if (archivioImpostazioni != null) {
+            archivioImpostazioni.salvaUnita(unita);
         }
     }
 
@@ -184,7 +216,7 @@ public final class Controller {
     public Risultato calcola(Ordine ordine) {
         Distinta distinta = new GeneratoreDistinta().genera(ordine);
         PianoDiTaglio piano = new BestFitDecreasing().ottimizza(distinta, magazzino);
-        Preventivo preventivo = new GeneratorePreventivo().genera(piano);
+        Preventivo preventivo = new GeneratorePreventivo().genera(piano, sogliaRitaglio());
         return new Risultato(distinta, piano, preventivo);
     }
 

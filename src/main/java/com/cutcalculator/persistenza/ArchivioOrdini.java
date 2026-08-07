@@ -140,12 +140,7 @@ public final class ArchivioOrdini {
 
     /** Il nome del sistema che contiene questa tipologia, o {@code null} se non è nel catalogo. */
     private String nomeSistema(Tipologia tipologia) {
-        for (Sistema sistema : catalogo.sistemi()) {
-            if (sistema.tipologie().contains(tipologia)) {
-                return sistema.nome();
-            }
-        }
-        return null;
+        return catalogo.sistemaDi(tipologia).map(Sistema::nome).orElse(null);
     }
 
     private static String togliBom(String riga) {

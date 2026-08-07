@@ -1,5 +1,7 @@
 package com.cutcalculator.catalogo;
 
+import com.cutcalculator.dominio.Profilo;
+import com.cutcalculator.dominio.RegolaTaglio;
 import com.cutcalculator.dominio.Tipologia;
 
 import java.util.List;
@@ -19,5 +21,17 @@ public record Sistema(String nome, FamigliaSistema famiglia, List<Tipologia> tip
     /** La tipologia con questo nome, se il sistema la prevede. */
     public Optional<Tipologia> tipologia(String nome) {
         return tipologie.stream().filter(t -> t.nome().equals(nome)).findFirst();
+    }
+
+    /**
+     * I profili distinti del sistema, presi dalle regole di tutte le sue tipologie: sono quelli
+     * fra cui l'utente sceglie quando dichiara un avanzo a magazzino.
+     */
+    public List<Profilo> profili() {
+        return tipologie.stream()
+                .flatMap(t -> t.regole().stream())
+                .map(RegolaTaglio::profilo)
+                .distinct()
+                .toList();
     }
 }

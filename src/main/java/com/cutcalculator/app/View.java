@@ -1,4 +1,4 @@
-package com.cutcalculator.cli;
+package com.cutcalculator.app;
 
 import com.cutcalculator.catalogo.Catalogo;
 import com.cutcalculator.dominio.Avanzo;
@@ -13,12 +13,12 @@ import java.util.List;
 /**
  * L'astrazione del <b>front-end</b>: sa avviarsi sopra un {@link Controller} e sa
  * <b>mostrare</b> all'utente gli oggetti del dominio. Ogni realizzazione fa l'override di
- * questi metodi a modo suo: oggi {@link CliView} (testo su console), domani una {@code GuiView}
+ * questi metodi a modo suo: {@code CliView} (testo su console) e {@code GuiFx}
  * (JavaFX, con i widget) — senza toccare il controller né il core.
  * <p>
- * Qui ci sono solo le firme. Restano <b>fuori</b> dall'interfaccia i dettagli specifici della
- * CLI (loop dei menu, lettura da tastiera, formattazione ASCII): non avrebbero senso per una
- * view grafica, quindi vivono privati dentro {@link CliView}.
+ * Qui ci sono solo le firme. Restano <b>fuori</b> dall'interfaccia i dettagli specifici di
+ * ciascun front-end (per la CLI: loop dei menu, lettura da tastiera, formattazione ASCII):
+ * non avrebbero senso per una view grafica, quindi vivono privati dentro {@code CliView}.
  */
 public interface View {
 
