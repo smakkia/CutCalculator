@@ -8,26 +8,25 @@ import com.cutcalculator.preventivo.Preventivo;
 import java.util.List;
 
 /**
- * Il risultato del <b>calcolo globale</b> di un insieme di ordini con magazzino condiviso
- * (vedi {@link PianificatoreOrdini}): il piano di taglio di <b>ogni</b> ordine, il
- * {@link Preventivo} aggregato (il materiale totale che serve per tutti gli ordini) e il
- * <b>magazzino aggiornato</b> dopo aver consumato gli avanzi usati e rimesso i ritagli
- * sopra soglia.
+ * Il risultato del <b>calcolo globale</b>: tutti gli ordini vengono <b>uniti come se fossero uno
+ * solo</b> e ottimizzati insieme (vedi {@link PianificatoreOrdini}), così i pezzi di ordini diversi
+ * possono condividere la stessa barra e lo sfrido cala.
  * <p>
- * È un valore immutabile: chi lo riceve (il controller) decide se applicarlo, cioè
- * sostituire il magazzino con {@link #magazzinoAggiornato()} e persisterlo.
+ * Contiene gli {@link Ordine ordini} inclusi (solo per riferimento/stampa), il <b>piano di taglio
+ * unico</b> di tutti insieme, il {@link Preventivo} aggregato e il <b>magazzino aggiornato</b> dopo
+ * aver consumato gli avanzi usati e rimesso i ritagli sopra soglia.
+ * <p>
+ * È un valore immutabile: chi lo riceve (il controller) decide se applicarlo, cioè sostituire il
+ * magazzino con {@link #magazzinoAggiornato()} e persisterlo.
  */
 public record EvasioneOrdini(
-        List<RisultatoOrdine> perOrdine,
+        List<Ordine> ordini,
+        PianoDiTaglio piano,
         Preventivo preventivoTotale,
         List<Avanzo> magazzinoAggiornato) {
 
     public EvasioneOrdini {
-        perOrdine = List.copyOf(perOrdine);
+        ordini = List.copyOf(ordini);
         magazzinoAggiornato = List.copyOf(magazzinoAggiornato);
-    }
-
-    /** Il piano di taglio di un singolo ordine dentro l'evasione. */
-    public record RisultatoOrdine(Ordine ordine, PianoDiTaglio piano) {
     }
 }

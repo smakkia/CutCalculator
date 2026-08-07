@@ -612,23 +612,23 @@ public final class CliView implements View {
     }
 
     /**
-     * Il calcolo globale: per ogni ordine il suo piano di taglio e i suoi sfridi, poi il
-     * <b>preventivo totale</b> (il materiale per tutti gli ordini insieme). Lo scarico del
-     * magazzino lo committa e lo conferma il chiamante, non questo render.
+     * Il calcolo globale: tutti gli ordini <b>uniti in un piano solo</b> (così i pezzi condividono le
+     * barre e lo sfrido cala), con il suo dettaglio per barra e il preventivo. Lo scarico del magazzino
+     * lo committa e lo conferma il chiamante, non questo render.
      */
     @Override
     public void evasione(EvasioneOrdini evasione) {
-        sezione("CALCOLO GLOBALE - " + conta(evasione.perOrdine().size(), "ordine", "ordini"));
-        for (EvasioneOrdini.RisultatoOrdine risultato : evasione.perOrdine()) {
-            System.out.println();
-            System.out.println(">>> ORDINE: " + risultato.ordine().nome());
-            if (risultato.piano().numeroBarre() == 0) {
-                System.out.println("    (nessun pezzo da tagliare)");
-                continue;
-            }
-            piano(risultato.piano());
-            sfridi(risultato.piano());
+        sezione("CALCOLO GLOBALE - " + conta(evasione.ordini().size(), "ordine", "ordini") + " uniti in un piano");
+        for (Ordine ordine : evasione.ordini()) {
+            System.out.printf("  - %-30s (%s)%n", ordine.nome(),
+                    conta(ordine.totaleSerramenti(), "serramento", "serramenti"));
         }
+        if (evasione.piano().numeroBarre() == 0) {
+            System.out.println("  (nessun pezzo da tagliare)");
+            return;
+        }
+        piano(evasione.piano());
+        sfridi(evasione.piano());
         preventivo(evasione.preventivoTotale());
     }
 
