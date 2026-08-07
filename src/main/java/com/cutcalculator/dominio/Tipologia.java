@@ -17,4 +17,12 @@ public record Tipologia(String nome, List<RegolaTaglio> regole) {
     public Tipologia {
         regole = List.copyOf(regole);
     }
+
+    /**
+     * {@code true} se qualche regola usa l'altezza parziale HF (coefficiente {@code cHF} non nullo),
+     * come nelle porte: la UI deve allora chiedere anche HF, non solo L e H.
+     */
+    public boolean usaHF() {
+        return regole.stream().anyMatch(r -> r.formula().cHF() != 0);
+    }
 }

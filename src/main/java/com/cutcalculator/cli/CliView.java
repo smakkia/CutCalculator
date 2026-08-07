@@ -180,20 +180,24 @@ public final class CliView implements View {
             System.out.println("  3) Apri ordine");
             System.out.println("  4) Rimuovi ordine");
             System.out.println("  5) Calcola tutti gli ordini (scarico magazzino)");
+            System.out.println("  6) Salva ordini su file");
+            System.out.println("  7) Carica ordini da file");
             System.out.println("  0) Indietro");
-            switch (leggiIntero("Scelta", 0, 5)) {
+            switch (leggiIntero("Scelta", 0, 7)) {
                 case 1 -> nuovoOrdine();
                 case 2 -> mostraOrdini();
                 case 3 -> apriOrdine();
                 case 4 -> rimuoviOrdine();
                 case 5 -> evadiOrdini();
+                case 6 -> salvaOrdiniSuFile();
+                case 7 -> caricaOrdiniDaFile();
                 case 0 -> resta = false;
             }
         }
     }
 
     private void nuovoOrdine() {
-        String nome = prompt("Nome del nuovo ordine> ").trim();
+        String nome = leggiNomeOrdine("Nome del nuovo ordine> ");
         int prossimo = controller.ordini().size() + 1;
         Ordine ordine = controller.nuovoOrdine(nome.isBlank() ? "Ordine " + prossimo : nome);
         System.out.println("  Creato: " + ordine.nome());
@@ -267,6 +271,34 @@ public final class CliView implements View {
         }
     }
 
+    /** Salva su disco tutti gli ordini correnti (comando esplicito: nessun autosave). */
+    private void salvaOrdiniSuFile() {
+        if (!controller.persistenzaOrdiniAttiva()) {
+            System.out.println("  Persistenza ordini non disponibile.");
+            return;
+        }
+        controller.salvaOrdini();
+        System.out.printf("  Salvati su disco: %s.%n",
+                conta(controller.ordini().size(), "ordine", "ordini"));
+    }
+
+    /** Ricarica gli ordini da disco, sostituendo quelli in memoria (previa conferma se ce ne sono). */
+    private void caricaOrdiniDaFile() {
+        if (!controller.persistenzaOrdiniAttiva()) {
+            System.out.println("  Persistenza ordini non disponibile.");
+            return;
+        }
+        int inMemoria = controller.ordini().size();
+        if (inMemoria > 0 && !prompt("  Il caricamento sostituisce gli ordini in memoria ("
+                + conta(inMemoria, "ordine", "ordini") + "). Confermi? [s/N]> ")
+                .trim().equalsIgnoreCase("s")) {
+            System.out.println("  Annullato: ordini invariati.");
+            return;
+        }
+        int caricati = controller.caricaOrdini();
+        System.out.printf("  Caricati da disco: %s.%n", conta(caricati, "ordine", "ordini"));
+    }
+
     // --- Gestione di un singolo ordine -------------------------------------------------
 
     private void gestisciOrdine(Ordine ordine) {
@@ -299,10 +331,12 @@ public final class CliView implements View {
         Colore colore = leggiColore("Colore");
         double l = leggiMisura("Larghezza L");
         double h = leggiMisura("Altezza H");
+        double hf = tipologia.usaHF() ? leggiMisura("Altezza parziale HF") : 0;
         int quantita = leggiQuantita("Quantita'");
-        ordine.aggiungi(new Serramento(tipologia, colore, l, h, quantita));
-        System.out.printf("  + %s / %s [%s]  %s x %s mm  x%d%n",
-                sistema.nome(), tipologia.nome(), colore.nome(), num(l), num(h), quantita);
+        ordine.aggiungi(new Serramento(tipologia, colore, new Dimensione(l, h, hf), quantita));
+        System.out.printf("  + %s / %s [%s]  %s x %s%s mm  x%d%n",
+                sistema.nome(), tipologia.nome(), colore.nome(), num(l), num(h),
+                hf > 0 ? " (HF " + num(hf) + ")" : "", quantita);
     }
 
     private void rimuoviSerramento(Ordine ordine) {
@@ -320,7 +354,7 @@ public final class CliView implements View {
     }
 
     private void rinominaOrdine(Ordine ordine) {
-        String nuovo = prompt("Nuovo nome (vuoto = invariato)> ").trim();
+        String nuovo = leggiNomeOrdine("Nuovo nome (vuoto = invariato)> ");
         if (nuovo.isBlank()) {
             System.out.println("  Nome invariato: " + ordine.nome());
             return;
@@ -402,12 +436,31 @@ public final class CliView implements View {
         }
     }
 
+    /**
+     * Legge il nome di un ordine (può essere vuoto: chi chiama decide il default) vietando il
+     * {@code ';'}, che è il separatore del file degli ordini e ne spezzerebbe la riga.
+     */
+    private String leggiNomeOrdine(String etichetta) {
+        while (true) {
+            String riga = prompt(etichetta).trim();
+            if (riga.indexOf(';') < 0) {
+                return riga;
+            }
+            System.out.println("  Il nome non puo' contenere ';' (separatore del file).");
+        }
+    }
+
     /** Legge un colore come testo libero (nome commerciale o codice RAL); non può essere vuoto. */
     private Colore leggiColore(String etichetta) {
         while (true) {
             String riga = prompt(etichetta + "> ").trim();
             if (!riga.isBlank()) {
-                return new Colore(riga);
+                try {
+                    return new Colore(riga);
+                } catch (IllegalArgumentException nonValido) {
+                    System.out.println("  " + nonValido.getMessage());
+                    continue;
+                }
             }
             System.out.println("  Inserisci un colore (es. bianco, bronzo, RAL9010).");
         }

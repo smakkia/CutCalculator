@@ -8,6 +8,7 @@ import com.cutcalculator.formule.GeneratoreDistinta;
 import com.cutcalculator.ottimizzatore.BestFitDecreasing;
 import com.cutcalculator.ottimizzatore.PianoDiTaglio;
 import com.cutcalculator.persistenza.ArchivioMagazzino;
+import com.cutcalculator.persistenza.ArchivioOrdini;
 import com.cutcalculator.pianificazione.EvasioneOrdini;
 import com.cutcalculator.pianificazione.PianificatoreOrdini;
 import com.cutcalculator.preventivo.GeneratorePreventivo;
@@ -30,21 +31,30 @@ public final class Controller {
 
     private final Catalogo catalogo;
     private final ArchivioMagazzino archivio;
+    private final ArchivioOrdini archivioOrdini;
     private final List<Avanzo> magazzino = new ArrayList<>();
     private final List<Ordine> ordini = new ArrayList<>();
 
     /** Solo in memoria, senza persistenza: comodo per test o usi effimeri. */
     public Controller(Catalogo catalogo) {
-        this(catalogo, null);
+        this(catalogo, null, null);
+    }
+
+    /** Con la sola persistenza del magazzino (gli ordini restano in memoria). */
+    public Controller(Catalogo catalogo, ArchivioMagazzino archivio) {
+        this(catalogo, archivio, null);
     }
 
     /**
-     * Collega un {@link ArchivioMagazzino}: il magazzino viene <b>caricato</b> da disco
-     * all'avvio e <b>risalvato</b> a ogni modifica. Con {@code archivio} null resta in memoria.
+     * Collega gli archivi su disco. Il <b>magazzino</b> viene caricato all'avvio e risalvato a ogni
+     * modifica ({@code archivio}). Gli <b>ordini</b> non si caricano da soli: il salvataggio e il
+     * caricamento sono <b>su comando</b> ({@link #salvaOrdini()} / {@link #caricaOrdini()}). Con un
+     * archivio null la rispettiva persistenza è disattivata (tutto resta in memoria).
      */
-    public Controller(Catalogo catalogo, ArchivioMagazzino archivio) {
+    public Controller(Catalogo catalogo, ArchivioMagazzino archivio, ArchivioOrdini archivioOrdini) {
         this.catalogo = catalogo;
         this.archivio = archivio;
+        this.archivioOrdini = archivioOrdini;
         if (archivio != null) {
             magazzino.addAll(archivio.carica());
         }
@@ -133,6 +143,34 @@ public final class Controller {
 
     public void rimuoviOrdine(Ordine ordine) {
         ordini.remove(ordine);
+    }
+
+    /** {@code true} se c'è un archivio ordini collegato (salvataggio/caricamento disponibili). */
+    public boolean persistenzaOrdiniAttiva() {
+        return archivioOrdini != null;
+    }
+
+    /** Salva su disco tutti gli ordini correnti; no-op se non c'è un archivio collegato. */
+    public void salvaOrdini() {
+        if (archivioOrdini != null) {
+            archivioOrdini.salva(ordini);
+        }
+    }
+
+    /**
+     * Rimpiazza gli ordini in memoria con quelli caricati da disco; no-op (ritorna 0) se non c'è
+     * un archivio collegato.
+     *
+     * @return quanti ordini sono stati caricati
+     */
+    public int caricaOrdini() {
+        if (archivioOrdini == null) {
+            return 0;
+        }
+        List<Ordine> caricati = archivioOrdini.carica();
+        ordini.clear();
+        ordini.addAll(caricati);
+        return caricati.size();
     }
 
     // --- Pipeline ----------------------------------------------------------------------

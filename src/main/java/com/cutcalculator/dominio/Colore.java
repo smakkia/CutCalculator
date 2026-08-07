@@ -11,6 +11,10 @@ import java.util.Locale;
  * Il nome e' testo libero (un nome commerciale o un codice RAL), ma viene <b>normalizzato</b>
  * (spazi ridotti, MAIUSCOLO) cosi' {@code "bianco"}, {@code "Bianco"} e {@code " BIANCO "} sono lo
  * stesso colore: niente doppioni per una svista di battitura.
+ * <p>
+ * Il {@code ';'} e' <b>vietato</b>: e' il separatore del CSV del magazzino, quindi un colore che lo
+ * contenesse spezzerebbe la riga e verrebbe perso al reload. Vietarlo qui, alla sorgente, garantisce
+ * il round-trip su disco (vedi {@code ArchivioMagazzino}).
  */
 public record Colore(String nome) {
 
@@ -19,5 +23,8 @@ public record Colore(String nome) {
             throw new IllegalArgumentException("Il colore non puo' essere vuoto");
         }
         nome = nome.trim().replaceAll("\\s+", " ").toUpperCase(Locale.ROOT);
+        if (nome.indexOf(';') >= 0) {
+            throw new IllegalArgumentException("Il colore non puo' contenere ';': " + nome);
+        }
     }
 }
