@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TabPane?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TreeTableColumn?>
+<?import javafx.scene.control.TreeTableView?>
+<?import javafx.scene.layout.BorderPane?>
+
+<!-- Tab Risultati: distinta, piano di taglio, sfridi e preventivo dell'ultimo calcolo. -->
+<BorderPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+            fx:controller="com.cutcalculator.gui.SchermataRisultati">
+    <top>
+        <Label fx:id="titolo" text="Nessun calcolo ancora: apri il tab Ordini e calcola."
+               style="-fx-font-weight: bold;">
+            <padding>
+                <Insets top="10.0" right="12.0" bottom="8.0" left="12.0"/>
+            </padding>
+        </Label>
+    </top>
+    <center>
+        <TabPane fx:id="schede" tabClosingPolicy="UNAVAILABLE">
+            <tabs>
+                <Tab fx:id="schedaDistinta" text="Distinta">
+                    <content>
+                        <BorderPane>
+                            <center>
+                                <TableView fx:id="tabellaDistinta">
+                                    <columns>
+                                        <TableColumn fx:id="distintaMateriale" text="Materiale" prefWidth="420.0"/>
+                                        <TableColumn fx:id="distintaLunghezza" text="Lunghezza (mm)" prefWidth="140.0"/>
+                                        <TableColumn fx:id="distintaTaglio" text="Taglio" prefWidth="120.0"/>
+                                        <TableColumn fx:id="distintaQuantita" text="Quantita'" prefWidth="90.0"/>
+                                    </columns>
+                                </TableView>
+                            </center>
+                            <bottom>
+                                <Label fx:id="riepilogoDistinta" text="">
+                                    <padding>
+                                        <Insets top="8.0" right="12.0" bottom="10.0" left="12.0"/>
+                                    </padding>
+                                </Label>
+                            </bottom>
+                        </BorderPane>
+                    </content>
+                </Tab>
+                <Tab fx:id="schedaPiano" text="Piano di taglio">
+                    <content>
+                        <BorderPane>
+                            <center>
+                                <TreeTableView fx:id="alberoPiano">
+                                    <columns>
+                                        <TreeTableColumn fx:id="pianoVoce" text="Barra / pezzo" prefWidth="480.0"/>
+                                        <TreeTableColumn fx:id="pianoLunghezza" text="Lunghezza (mm)" prefWidth="140.0"/>
+                                        <TreeTableColumn fx:id="pianoTaglio" text="Taglio" prefWidth="120.0"/>
+                                        <TreeTableColumn fx:id="pianoSfrido" text="Sfrido (mm)" prefWidth="120.0"/>
+                                    </columns>
+                                </TreeTableView>
+                            </center>
+                            <bottom>
+                                <Label fx:id="riepilogoPiano" text="">
+                                    <padding>
+                                        <Insets top="8.0" right="12.0" bottom="10.0" left="12.0"/>
+                                    </padding>
+                                </Label>
+                            </bottom>
+                        </BorderPane>
+                    </content>
+                </Tab>
+                <Tab fx:id="schedaSfridi" text="Sfridi">
+                    <content>
+                        <TableView fx:id="tabellaSfridi">
+                            <columns>
+                                <TableColumn fx:id="sfridiMateriale" text="Materiale" prefWidth="400.0"/>
+                                <TableColumn fx:id="sfridiTipo" text="Tipo" prefWidth="110.0"/>
+                                <TableColumn fx:id="sfridiBarra" text="Barra (mm)" prefWidth="110.0"/>
+                                <TableColumn fx:id="sfridiOccupato" text="Occupato (mm)" prefWidth="130.0"/>
+                                <TableColumn fx:id="sfridiSfrido" text="Sfrido (mm)" prefWidth="110.0"/>
+                                <TableColumn fx:id="sfridiEsito" text="Destinazione" prefWidth="150.0"/>
+                            </columns>
+                        </TableView>
+                    </content>
+                </Tab>
+                <Tab fx:id="schedaPreventivo" text="Preventivo">
+                    <content>
+                        <BorderPane>
+                            <center>
+                                <TableView fx:id="tabellaPreventivo">
+                                    <columns>
+                                        <TableColumn fx:id="preventivoProfilo" text="Profilo" prefWidth="320.0"/>
+                                        <TableColumn fx:id="preventivoColore" text="Colore" prefWidth="120.0"/>
+                                        <TableColumn fx:id="preventivoBarreNuove" text="Barre nuove" prefWidth="110.0"/>
+                                        <TableColumn fx:id="preventivoAvanzi" text="Avanzi usati" prefWidth="110.0"/>
+                                        <TableColumn fx:id="preventivoLunghezza" text="Nuovo (mm)" prefWidth="110.0"/>
+                                        <TableColumn fx:id="preventivoSfrido" text="Sfrido (mm)" prefWidth="110.0"/>
+                                        <TableColumn fx:id="preventivoRitagli" text="Ritagli" prefWidth="80.0"/>
+                                        <TableColumn fx:id="preventivoRecuperabile" text="Da riusare (mm)" prefWidth="130.0"/>
+                                    </columns>
+                                </TableView>
+                            </center>
+                            <bottom>
+                                <Label fx:id="totaliPreventivo" text="">
+                                    <padding>
+                                        <Insets top="8.0" right="12.0" bottom="10.0" left="12.0"/>
+                                    </padding>
+                                </Label>
+                            </bottom>
+                        </BorderPane>
+                    </content>
+                </Tab>
+            </tabs>
+        </TabPane>
+    </center>
+</BorderPane>

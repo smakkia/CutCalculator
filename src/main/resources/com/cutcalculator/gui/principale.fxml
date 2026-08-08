@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Menu?>
+<?import javafx.scene.control.MenuBar?>
+<?import javafx.scene.control.MenuItem?>
+<?import javafx.scene.control.SeparatorMenuItem?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TabPane?>
+<?import javafx.scene.layout.BorderPane?>
+
+<!--
+  La finestra: barra dei menu piu' i tre tab dell'applicazione.
+  Ogni tab e' un FXML a se' (fx:include), cosi' in SceneBuilder si lavora su una schermata alla
+  volta; JavaFX inietta il rispettivo controller in SchermataPrincipale come "<fx:id>Controller".
+-->
+<BorderPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+            fx:controller="com.cutcalculator.gui.SchermataPrincipale"
+            prefWidth="1100.0" prefHeight="720.0">
+    <top>
+        <MenuBar>
+            <menus>
+                <Menu text="File">
+                    <items>
+                        <!-- Le voci mm/cm/m le aggiunge SchermataPrincipale: una per ogni Unita. -->
+                        <Menu fx:id="menuUnita" text="Unita' di misura"/>
+                        <SeparatorMenuItem/>
+                        <MenuItem text="Esci" onAction="#esci"/>
+                    </items>
+                </Menu>
+                <Menu text="Ordini">
+                    <items>
+                        <MenuItem fx:id="voceSalvaOrdini" text="Salva ordini su file" onAction="#salvaOrdini"/>
+                        <MenuItem fx:id="voceCaricaOrdini" text="Carica ordini da file" onAction="#caricaOrdini"/>
+                    </items>
+                </Menu>
+                <Menu text="Aiuto">
+                    <items>
+                        <MenuItem text="Catalogo..." onAction="#apriCatalogo"/>
+                    </items>
+                </Menu>
+            </menus>
+        </MenuBar>
+    </top>
+    <center>
+        <TabPane fx:id="schede" tabClosingPolicy="UNAVAILABLE">
+            <tabs>
+                <Tab fx:id="schedaMagazzino" text="Magazzino">
+                    <content>
+                        <fx:include fx:id="magazzino" source="magazzino.fxml"/>
+                    </content>
+                </Tab>
+                <Tab fx:id="schedaOrdini" text="Ordini">
+                    <content>
+                        <fx:include fx:id="ordini" source="ordini.fxml"/>
+                    </content>
+                </Tab>
+                <Tab fx:id="schedaRisultati" text="Risultati">
+                    <content>
+                        <fx:include fx:id="risultati" source="risultati.fxml"/>
+                    </content>
+                </Tab>
+            </tabs>
+        </TabPane>
+    </center>
+</BorderPane>

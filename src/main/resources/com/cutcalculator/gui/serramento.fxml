@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Spinner?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+
+<!-- Contenuto del dialogo "aggiungi serramento" (vedi DialogoSerramento). -->
+<GridPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+          fx:controller="com.cutcalculator.gui.SchermataSerramento"
+          hgap="8.0" vgap="8.0">
+    <padding>
+        <Insets top="10.0" right="10.0" bottom="10.0" left="10.0"/>
+    </padding>
+    <columnConstraints>
+        <ColumnConstraints minWidth="150.0"/>
+        <ColumnConstraints minWidth="300.0"/>
+    </columnConstraints>
+    <children>
+        <Label text="Sistema" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
+        <ComboBox fx:id="sceltaSistema" prefWidth="320.0"
+                  GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+
+        <Label text="Tipologia" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
+        <ComboBox fx:id="sceltaTipologia" prefWidth="320.0"
+                  GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+
+        <Label text="Colore" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
+        <TextField fx:id="campoColore" promptText="bianco, bronzo, RAL9010..."
+                   GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+
+        <Label fx:id="etichettaL" text="Larghezza L" GridPane.rowIndex="3" GridPane.columnIndex="0"/>
+        <TextField fx:id="campoL" promptText="mm" GridPane.rowIndex="3" GridPane.columnIndex="1"/>
+
+        <Label fx:id="etichettaH" text="Altezza H" GridPane.rowIndex="4" GridPane.columnIndex="0"/>
+        <TextField fx:id="campoH" promptText="mm" GridPane.rowIndex="4" GridPane.columnIndex="1"/>
+
+        <Label fx:id="etichettaHF" text="Altezza parziale HF" disable="true"
+               GridPane.rowIndex="5" GridPane.columnIndex="0"/>
+        <TextField fx:id="campoHF" promptText="solo per le porte" disable="true"
+                   GridPane.rowIndex="5" GridPane.columnIndex="1"/>
+
+        <Label text="Quantita'" GridPane.rowIndex="6" GridPane.columnIndex="0"/>
+        <Spinner fx:id="campoQuantita" prefWidth="110.0"
+                 GridPane.rowIndex="6" GridPane.columnIndex="1"/>
+    </children>
+</GridPane>
