@@ -20,7 +20,7 @@ import java.util.Optional;
  * ma ricalcolati dalle quantità, e restano legati ai prezzi con cui il preventivo è stato fatto —
  * che è esattamente quello che ci si aspetta da un preventivo. Senza listino i costi sono zero.
  */
-public record Preventivo(List<RigaProfilo> righe, List<RigaVetro> righeVetro, Prezzi prezzi) {
+public record Preventivo(List<RigaProfilo> righe, List<RigaVetro> righeVetro) {
 
     public Preventivo {
         righe = List.copyOf(righe);
@@ -29,12 +29,7 @@ public record Preventivo(List<RigaProfilo> righe, List<RigaVetro> righeVetro, Pr
 
     /** Preventivo di soli profili: quando la tipologia non ha (ancora) le quote del vetro. */
     public Preventivo(List<RigaProfilo> righe) {
-        this(righe, List.of(), Prezzi.NESSUNO);
-    }
-
-    /** Preventivo di sole quantità, senza listino: tutti i costi vengono zero. */
-    public Preventivo(List<RigaProfilo> righe, List<RigaVetro> righeVetro) {
-        this(righe, righeVetro, Prezzi.NESSUNO);
+        this(righe, List.of());
     }
 
     /** Barre nuove da comprare in totale, su tutti i profili. */
@@ -89,14 +84,19 @@ public record Preventivo(List<RigaProfilo> righe, List<RigaVetro> righeVetro, Pr
         return righe.stream().mapToDouble(RigaProfilo::peso).sum();
     }
 
-    /** Quanto costano le barre nuove: il peso di ogni riga per il suo €/kg. */
+    /** Quanto costano le barre nuove da comprare. */
     public double costoBarre() {
-        return righe.stream().mapToDouble(riga -> riga.costo(prezzi)).sum();
+        return righe.stream().mapToDouble(RigaProfilo::costo).sum();
     }
 
-    /** Quanto costa il vetro: la superficie ordinata per il €/mq. */
+    /** Quanto costa il vetro da ordinare. */
     public double costoVetro() {
-        return righeVetro.stream().mapToDouble(riga -> riga.costo(prezzi)).sum();
+        return righeVetro.stream().mapToDouble(RigaVetro::costo).sum();
+    }
+
+    /** {@code true} se almeno una voce ha un costo: sotto questa condizione i totali hanno senso. */
+    public boolean valorizzato() {
+        return costoTotale() > 0;
     }
 
     /** Il costo del materiale dell'ordine: barre nuove + vetro. */

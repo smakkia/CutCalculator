@@ -22,10 +22,22 @@ import com.cutcalculator.dominio.Profilo;
  * @param sfrido               sfrido complessivo, su <b>tutte</b> le barre di quel materiale (nuove e avanzi)
  * @param ritagliRecuperabili  quanti residui sopra soglia rientreranno in magazzino
  * @param lunghezzaRecuperabile lunghezza totale di quei residui (la parte di sfrido che non è scarto)
+ * @param costo                quanto costano quelle barre nuove. Non è {@code peso × un} €/kg: i
+ *                             pezzi su una barra possono venire da serramenti con listini diversi,
+ *                             quindi ogni barra è pagata dai suoi pezzi in proporzione alla
+ *                             lunghezza, ciascuno al proprio prezzo (vedi {@code GeneratorePreventivo})
  */
 public record RigaProfilo(Profilo profilo, Colore colore, int barreNuove, int avanziUsati,
         double lunghezzaNuova, double sfrido,
-        int ritagliRecuperabili, double lunghezzaRecuperabile) {
+        int ritagliRecuperabili, double lunghezzaRecuperabile, double costo) {
+
+    /** Riga senza costo: quando non interessa la valorizzazione. */
+    public RigaProfilo(Profilo profilo, Colore colore, int barreNuove, int avanziUsati,
+            double lunghezzaNuova, double sfrido,
+            int ritagliRecuperabili, double lunghezzaRecuperabile) {
+        this(profilo, colore, barreNuove, avanziUsati, lunghezzaNuova, sfrido,
+                ritagliRecuperabili, lunghezzaRecuperabile, 0);
+    }
 
     /** Lo sfrido che non si recupera: spezzoni troppo corti per tornare a magazzino. */
     public double scarto() {
@@ -40,8 +52,4 @@ public record RigaProfilo(Profilo profilo, Colore colore, int barreNuove, int av
         return profilo.peso(lunghezzaNuova);
     }
 
-    /** Quanto costano le barre nuove di questa riga: {@link #peso()} × €/kg del listino. */
-    public double costo(Prezzi prezzi) {
-        return prezzi.costoBarre(profilo, peso());
-    }
 }

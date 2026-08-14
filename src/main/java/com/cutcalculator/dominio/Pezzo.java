@@ -13,9 +13,23 @@ package com.cutcalculator.dominio;
  * @param lunghezza   lunghezza in mm, già calcolata dalla formula
  * @param tipoTaglio  come sono tagliate le due estremità
  * @param descrizione etichetta/ruolo, ereditata dalla riga di taglio
+ * @param prezzi      il listino del {@link Serramento} da cui viene: il €/kg può cambiare da un
+ *                    serramento all'altro (colori diversi, fornitori diversi), quindi ogni pezzo
+ *                    si porta dietro il proprio invece di attingere a un listino unico
  */
 public record Pezzo(Profilo profilo, Colore colore, double lunghezza,
-        TipoTaglio tipoTaglio, String descrizione) {
+        TipoTaglio tipoTaglio, String descrizione, Prezzi prezzi) {
+
+    /** Senza listino: il pezzo si può tagliare ma non valorizzare. */
+    public Pezzo(Profilo profilo, Colore colore, double lunghezza,
+            TipoTaglio tipoTaglio, String descrizione) {
+        this(profilo, colore, lunghezza, tipoTaglio, descrizione, Prezzi.NESSUNO);
+    }
+
+    /** Il €/kg da applicare a questo pezzo: quello del serramento da cui viene. */
+    public double prezzoAlChilo() {
+        return prezzi.alChiloDi(profilo);
+    }
 
     /** Il {@link Materiale} (profilo + colore): la chiave con cui l'ottimizzatore raggruppa i pezzi. */
     public Materiale materiale() {
@@ -27,8 +41,8 @@ public record Pezzo(Profilo profilo, Colore colore, double lunghezza,
         return profilo.peso(lunghezza);
     }
 
-    /** Costo del materiale di questo pezzo (€): peso × prezzo al chilo del profilo. */
+    /** Costo del solo pezzo (€): peso × €/kg. Il costo <b>vero</b> è quello della barra intera. */
     public double prezzo() {
-        return profilo.prezzo(lunghezza);
+        return peso() * prezzoAlChilo();
     }
 }

@@ -2,6 +2,7 @@ package com.cutcalculator.gui;
 
 import com.cutcalculator.app.Unita;
 import com.cutcalculator.catalogo.Catalogo;
+import com.cutcalculator.dominio.Prezzi;
 import com.cutcalculator.dominio.Serramento;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXMLLoader;
@@ -25,7 +26,7 @@ final class DialogoSerramento {
     private DialogoSerramento() {
     }
 
-    static Optional<Serramento> chiedi(Catalogo catalogo, Unita unita) {
+    static Optional<Serramento> chiedi(Catalogo catalogo, Unita unita, Prezzi predefiniti) {
         FXMLLoader caricatore = new FXMLLoader(
                 DialogoSerramento.class.getResource("serramento.fxml"));
         Dialog<Serramento> dialogo = new Dialog<>();
@@ -35,7 +36,7 @@ final class DialogoSerramento {
             throw new UncheckedIOException("FXML non caricabile: serramento.fxml", e);
         }
         SchermataSerramento schermata = caricatore.getController();
-        schermata.inizializza(catalogo, unita);
+        schermata.inizializza(catalogo, unita, predefiniti);
 
         dialogo.setTitle("Aggiungi serramento");
         dialogo.setHeaderText(null);

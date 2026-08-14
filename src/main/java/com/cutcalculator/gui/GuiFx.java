@@ -5,8 +5,9 @@ import com.cutcalculator.app.View;
 import com.cutcalculator.catalogo.Catalogo;
 import com.cutcalculator.dominio.Avanzo;
 import com.cutcalculator.dominio.Ordine;
-import com.cutcalculator.formule.Distinta;
 import com.cutcalculator.ottimizzatore.PianoDiTaglio;
+import com.cutcalculator.pianificazione.DistintaOrdine;
+import com.cutcalculator.persistenza.ArchivioCalcoli;
 import com.cutcalculator.persistenza.ArchivioImpostazioni;
 import com.cutcalculator.persistenza.ArchivioMagazzino;
 import com.cutcalculator.persistenza.ArchivioOrdini;
@@ -36,9 +37,10 @@ import java.util.List;
  */
 public final class GuiFx extends Application implements View {
 
-    private static final Path FILE_MAGAZZINO = Path.of("dati", "magazzino.csv");
-    private static final Path FILE_ORDINI = Path.of("dati", "ordini.csv");
-    private static final Path FILE_IMPOSTAZIONI = Path.of("dati", "impostazioni.properties");
+    private static final Path CARTELLA_DATI = Path.of("dati");
+    private static final Path FILE_MAGAZZINO = CARTELLA_DATI.resolve("magazzino.csv");
+    private static final Path FILE_ORDINI = CARTELLA_DATI.resolve("ordini.csv");
+    private static final Path FILE_IMPOSTAZIONI = CARTELLA_DATI.resolve("impostazioni.properties");
 
     private Stage finestra;
     private SchermataPrincipale schermata;
@@ -50,7 +52,8 @@ public final class GuiFx extends Application implements View {
         ArchivioMagazzino archivio = new ArchivioMagazzino(FILE_MAGAZZINO, catalogo);
         ArchivioOrdini archivioOrdini = new ArchivioOrdini(FILE_ORDINI, catalogo);
         ArchivioImpostazioni impostazioni = new ArchivioImpostazioni(FILE_IMPOSTAZIONI);
-        avvia(new Controller(catalogo, archivio, archivioOrdini, impostazioni));
+        avvia(new Controller(catalogo, archivio, archivioOrdini, impostazioni,
+                new ArchivioCalcoli(CARTELLA_DATI)));
     }
 
     /**
@@ -91,8 +94,8 @@ public final class GuiFx extends Application implements View {
     }
 
     @Override
-    public void distinta(Distinta distinta) {
-        schermata.mostraDistinta(distinta);
+    public void distinta(List<DistintaOrdine> distinte) {
+        schermata.mostraDistinta(distinte);
     }
 
     @Override

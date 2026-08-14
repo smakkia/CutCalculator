@@ -10,7 +10,9 @@ import com.cutcalculator.dominio.TipoTaglio;
 import com.cutcalculator.formule.Distinta;
 import com.cutcalculator.ottimizzatore.BarraTagliata;
 import com.cutcalculator.ottimizzatore.PianoDiTaglio;
+import com.cutcalculator.pianificazione.DistintaOrdine;
 import com.cutcalculator.pianificazione.EvasioneOrdini;
+import com.cutcalculator.pianificazione.QuotaOrdine;
 import com.cutcalculator.preventivo.Preventivo;
 import com.cutcalculator.preventivo.RigaProfilo;
 import com.cutcalculator.preventivo.RigaVetro;
@@ -22,14 +24,18 @@ import javafx.scene.control.Label;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeTableColumn;
 import javafx.scene.control.TreeTableView;
+import javafx.scene.layout.VBox;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.function.ToDoubleFunction;
 import java.util.stream.Collectors;
 
 /**
@@ -49,11 +55,11 @@ public final class SchermataRisultati {
     @FXML private Tab schedaSfridi;
     @FXML private Tab schedaPreventivo;
 
-    @FXML private TableView<RigaDistinta> tabellaDistinta;
-    @FXML private TableColumn<RigaDistinta, String> distintaMateriale;
-    @FXML private TableColumn<RigaDistinta, String> distintaLunghezza;
-    @FXML private TableColumn<RigaDistinta, String> distintaTaglio;
-    @FXML private TableColumn<RigaDistinta, String> distintaQuantita;
+    @FXML private TreeTableView<NodoDistinta> alberoDistinta;
+    @FXML private TreeTableColumn<NodoDistinta, String> distintaMateriale;
+    @FXML private TreeTableColumn<NodoDistinta, String> distintaLunghezza;
+    @FXML private TreeTableColumn<NodoDistinta, String> distintaTaglio;
+    @FXML private TreeTableColumn<NodoDistinta, String> distintaQuantita;
     @FXML private Label riepilogoDistinta;
 
     @FXML private TreeTableView<NodoPiano> alberoPiano;
@@ -85,6 +91,16 @@ public final class SchermataRisultati {
     @FXML private Label totaliPreventivo;
     @FXML private Label costiPreventivo;
 
+    @FXML private VBox boxQuoteProfili;
+    @FXML private TableView<CostoOrdine> tabellaQuoteProfili;
+    @FXML private TableColumn<CostoOrdine, String> quotaOrdine;
+    @FXML private TableColumn<CostoOrdine, String> quotaCosto;
+
+    @FXML private VBox boxQuoteVetri;
+    @FXML private TableView<CostoOrdine> tabellaQuoteVetri;
+    @FXML private TableColumn<CostoOrdine, String> quotaVetroOrdine;
+    @FXML private TableColumn<CostoOrdine, String> quotaVetroCosto;
+
     @FXML private Tab schedaVetri;
     @FXML private TableView<RigaVetro> tabellaVetri;
     @FXML private TableColumn<RigaVetro, String> vetriAltezza;
@@ -95,10 +111,11 @@ public final class SchermataRisultati {
     @FXML private TableColumn<RigaVetro, String> vetriCosto;
     @FXML private Label totaliVetri;
 
-    private final ObservableList<RigaDistinta> righeDistinta = FXCollections.observableArrayList();
     private final ObservableList<BarraTagliata> righeSfridi = FXCollections.observableArrayList();
     private final ObservableList<RigaProfilo> righePreventivo = FXCollections.observableArrayList();
     private final ObservableList<RigaVetro> righeVetri = FXCollections.observableArrayList();
+    private final ObservableList<CostoOrdine> righeQuoteProfili = FXCollections.observableArrayList();
+    private final ObservableList<CostoOrdine> righeQuoteVetri = FXCollections.observableArrayList();
 
     private Controller controller;
     private Preventivo preventivoMostrato;
@@ -107,24 +124,36 @@ public final class SchermataRisultati {
     public record RigaDistinta(Materiale materiale, double lunghezza, TipoTaglio taglio, long quantita) {
     }
 
+    /** Un nodo dell'albero della distinta: o un ordine, o una riga di pezzi dentro di esso. */
+    public record NodoDistinta(String voce, String lunghezza, String taglio, String quantita) {
+    }
+
     /** Una riga dell'albero del piano: o una barra, o un pezzo dentro di essa. */
     public record NodoPiano(String voce, String lunghezza, String taglio, String sfrido) {
+    }
+
+    /**
+     * Una voce della divisione per ordine: il nome e quanto costa. L'ultima riga è il totale, con
+     * {@code totale = true} — così la tabella lo mostra in fondo invece di lasciarlo a una didascalia.
+     */
+    public record CostoOrdine(String ordine, double costo, boolean totale) {
     }
 
     @FXML
     private void initialize() {
         distintaMateriale.setCellValueFactory(riga ->
-                new ReadOnlyStringWrapper(Etichette.materiale(riga.getValue().materiale())));
+                new ReadOnlyStringWrapper(riga.getValue().getValue().voce()));
         distintaLunghezza.setCellValueFactory(riga ->
-                new ReadOnlyStringWrapper(misura(riga.getValue().lunghezza())));
+                new ReadOnlyStringWrapper(riga.getValue().getValue().lunghezza()));
         distintaTaglio.setCellValueFactory(riga ->
-                new ReadOnlyStringWrapper(Etichette.taglio(riga.getValue().taglio())));
+                new ReadOnlyStringWrapper(riga.getValue().getValue().taglio()));
         distintaQuantita.setCellValueFactory(riga ->
-                new ReadOnlyStringWrapper("x" + riga.getValue().quantita()));
-        allineaDestra(distintaLunghezza, distintaQuantita);
-        tabellaDistinta.setItems(righeDistinta);
-        tabellaDistinta.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
-        tabellaDistinta.setPlaceholder(new Label("Nessun calcolo ancora: usa il tab Ordini."));
+                new ReadOnlyStringWrapper(riga.getValue().getValue().quantita()));
+        distintaLunghezza.setStyle("-fx-alignment: CENTER-RIGHT;");
+        distintaQuantita.setStyle("-fx-alignment: CENTER-RIGHT;");
+        alberoDistinta.setColumnResizePolicy(TreeTableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+        alberoDistinta.setShowRoot(false);
+        alberoDistinta.setPlaceholder(new Label("Nessun calcolo ancora: usa il tab Ordini."));
 
         pianoVoce.setCellValueFactory(riga ->
                 new ReadOnlyStringWrapper(riga.getValue().getValue().voce()));
@@ -178,7 +207,7 @@ public final class SchermataRisultati {
         preventivoPeso.setCellValueFactory(riga ->
                 new ReadOnlyStringWrapper(kg(riga.getValue().peso())));
         preventivoCosto.setCellValueFactory(riga ->
-                new ReadOnlyStringWrapper(euro(riga.getValue().costo(prezzi()))));
+                new ReadOnlyStringWrapper(euro(riga.getValue().costo())));
         allineaDestra(preventivoBarreNuove, preventivoAvanzi, preventivoLunghezza, preventivoSfrido,
                 preventivoRitagli, preventivoRecuperabile, preventivoPeso, preventivoCosto);
         tabellaPreventivo.setItems(righePreventivo);
@@ -196,12 +225,34 @@ public final class SchermataRisultati {
         vetriAreaTotale.setCellValueFactory(riga ->
                 new ReadOnlyStringWrapper(mq(riga.getValue().areaTotaleMq())));
         vetriCosto.setCellValueFactory(riga ->
-                new ReadOnlyStringWrapper(euro(riga.getValue().costo(prezzi()))));
+                new ReadOnlyStringWrapper(euro(riga.getValue().costo())));
         allineaDestra(vetriAltezza, vetriLarghezza, vetriQuantita, vetriAreaLastra, vetriAreaTotale,
                 vetriCosto);
+
+        preparaTabellaCosti(tabellaQuoteProfili, righeQuoteProfili, quotaOrdine, quotaCosto);
+        preparaTabellaCosti(tabellaQuoteVetri, righeQuoteVetri, quotaVetroOrdine, quotaVetroCosto);
+        mostraDivisione(List.of());   // finche' non c'e' un calcolo globale, le due tabelle spariscono
         tabellaVetri.setItems(righeVetri);
         tabellaVetri.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         tabellaVetri.setPlaceholder(new Label("Nessuna quota vetro per queste tipologie."));
+    }
+
+    /** Una delle due tabelle "per ordine": nome e costo, con l'ultima riga (il totale) in grassetto. */
+    private void preparaTabellaCosti(TableView<CostoOrdine> tabella, ObservableList<CostoOrdine> righe,
+            TableColumn<CostoOrdine, String> colonnaOrdine, TableColumn<CostoOrdine, String> colonnaCosto) {
+        colonnaOrdine.setCellValueFactory(riga -> new ReadOnlyStringWrapper(riga.getValue().ordine()));
+        colonnaCosto.setCellValueFactory(riga ->
+                new ReadOnlyStringWrapper(euro(riga.getValue().costo())));
+        allineaDestra(colonnaCosto);
+        tabella.setItems(righe);
+        tabella.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+        tabella.setRowFactory(vista -> new TableRow<>() {
+            @Override
+            protected void updateItem(CostoOrdine voce, boolean vuota) {
+                super.updateItem(voce, vuota);
+                setStyle(!vuota && voce != null && voce.totale() ? "-fx-font-weight: bold;" : "");
+            }
+        });
     }
 
     public void inizializza(Controller controller) {
@@ -223,23 +274,14 @@ public final class SchermataRisultati {
         preventivoRecuperabile.setText("Da riusare" + simbolo);
         vetriAltezza.setText("Altezza H" + simbolo);
         vetriLarghezza.setText("Larghezza L" + simbolo);
-        tabellaDistinta.refresh();
+        // Le due tabelle "per ordine" hanno solo nomi e importi: nessuna intestazione da rifare.
+        alberoDistinta.refresh();
         alberoPiano.refresh();
         tabellaSfridi.refresh();
         tabellaPreventivo.refresh();
         tabellaVetri.refresh();
     }
 
-    /**
-     * L'utente ha cambiato il listino: i costi mostrati vanno rifatti. Il preventivo però porta
-     * dentro di sé i prezzi con cui è stato generato, quindi l'unico modo onesto di aggiornarlo è
-     * ricalcolarlo — qui ci limitiamo a dirlo, senza far finta che i vecchi numeri siano nuovi.
-     */
-    public void aggiornaPrezzi() {
-        if (!righePreventivo.isEmpty() || !righeVetri.isEmpty()) {
-            titolo.setText("Prezzi aggiornati: ricalcola per vedere i nuovi costi.");
-        }
-    }
 
     /** Una misura del modello (mm) nell'unità scelta dall'utente. */
     private String misura(double mm) {
@@ -268,8 +310,8 @@ public final class SchermataRisultati {
      * Il listino con cui valorizzare le celle: quello del preventivo mostrato, non quello corrente
      * del controller — una tabella deve restare coerente con i totali sotto di lei.
      */
-    private Prezzi prezzi() {
-        return preventivoMostrato == null ? controller.prezzi() : preventivoMostrato.prezzi();
+    private boolean valorizzato() {
+        return preventivoMostrato != null && preventivoMostrato.valorizzato();
     }
 
     /** Una misura col simbolo dell'unità: per i riepiloghi a testo libero. */
@@ -279,13 +321,42 @@ public final class SchermataRisultati {
 
     // --- Riempimento delle viste -------------------------------------------------------
 
-    public void mostraDistinta(Distinta distinta) {
-        righeDistinta.setAll(aggrega(distinta));
-        riepilogoDistinta.setText(distinta.totalePezzi() + " pezzi da tagliare, "
-                + distinta.perMateriale().size() + " materiali"
-                + (distinta.vetri().isEmpty() ? "." : "; " + distinta.totaleLastre() + " lastre di vetro ("
-                        + mq(distinta.areaVetroTotaleMq()) + " mq) nel tab Vetri."));
+    /**
+     * Cosa c'è da tagliare, <b>raggruppato per ordine</b> come il piano lo è per barra: un nodo per
+     * commessa, dentro le righe dei pezzi uguali contati insieme. È la lista che si porta in officina,
+     * dove serve sapere di chi è ogni pezzo — il piano poi li mescolerà sulle barre.
+     */
+    public void mostraDistinta(List<DistintaOrdine> distinte) {
+        alberoDistinta.setRoot(alberoDi(distinte));
+        int pezzi = distinte.stream().mapToInt(d -> d.distinta().totalePezzi()).sum();
+        int lastre = distinte.stream().mapToInt(d -> d.distinta().totaleLastre()).sum();
+        double mqVetro = distinte.stream().mapToDouble(d -> d.distinta().areaVetroTotaleMq()).sum();
+        riepilogoDistinta.setText(pezzi + " pezzi da tagliare in " + distinte.size() + " ordini"
+                + (lastre == 0 ? "." : "; " + lastre + " lastre di vetro (" + mq(mqVetro)
+                        + " mq) nel tab Vetri."));
         schede.getSelectionModel().select(schedaDistinta);
+    }
+
+    /** L'albero della distinta: un nodo per ordine, i suoi gruppi di pezzi come figli. */
+    private TreeItem<NodoDistinta> alberoDi(List<DistintaOrdine> distinte) {
+        TreeItem<NodoDistinta> radice = new TreeItem<>(new NodoDistinta("Distinta", "", "", ""));
+        for (DistintaOrdine voce : distinte) {
+            Distinta distinta = voce.distinta();
+            TreeItem<NodoDistinta> nodo = new TreeItem<>(new NodoDistinta(
+                    voce.ordine(), "", distinta.perMateriale().size() + " materiali",
+                    distinta.totalePezzi() + " pezzi"));
+            for (RigaDistinta riga : aggrega(distinta)) {
+                nodo.getChildren().add(new TreeItem<>(new NodoDistinta(
+                        "    " + Etichette.materiale(riga.materiale()),
+                        misura(riga.lunghezza()),
+                        Etichette.taglio(riga.taglio()),
+                        "x" + riga.quantita())));
+            }
+            nodo.setExpanded(true);
+            radice.getChildren().add(nodo);
+        }
+        radice.setExpanded(true);
+        return radice;
     }
 
     public void mostraPiano(PianoDiTaglio piano) {
@@ -325,13 +396,12 @@ public final class SchermataRisultati {
      * hanno ancora i kg/m di scheda, quindi le barre non si possono valorizzare.
      */
     private void mostraCosti(Preventivo preventivo) {
-        Prezzi prezzi = preventivo.prezzi();
-        if (!prezzi.impostati()) {
-            costiPreventivo.setText("Costi non calcolati: imposta i prezzi da File -> "
-                    + "Prezzi del materiale...");
+        if (!preventivo.valorizzato()) {
+            costiPreventivo.setText("Costi a zero: i serramenti non hanno prezzi dichiarati "
+                    + "(si inseriscono aggiungendo il serramento).");
             return;
         }
-        String avviso = prezzi.alChiloBarre() > 0 && preventivo.pesoTotale() == 0
+        String avviso = preventivo.costoBarre() == 0 && preventivo.pesoTotale() == 0
                 ? "   (le barre pesano 0: i profili del catalogo non hanno ancora i kg/m)"
                 : "";
         costiPreventivo.setText("Barre nuove " + euro(preventivo.costoBarre())
@@ -339,6 +409,36 @@ public final class SchermataRisultati {
                 + "   +   vetro " + euro(preventivo.costoVetro())
                 + " (" + mq(preventivo.areaVetroTotaleMq()) + " mq)"
                 + "   =   TOTALE ORDINE " + euro(preventivo.costoTotale()) + avviso);
+    }
+
+    /**
+     * La divisione per ordine, <b>dentro</b> le viste del preventivo e dei vetri: una tabella sotto
+     * l'altra, non un tab a parte. Compare solo con <b>più di un ordine</b>, perché con uno solo
+     * ripeterebbe le stesse cifre della tabella sopra.
+     * <p>
+     * Per l'alluminio è una <b>quota</b> (le barre sono condivise, vedi {@link QuotaOrdine}), per il
+     * vetro sono numeri esatti; in entrambi i casi le righe sommano ai totali.
+     */
+    private void mostraDivisione(List<QuotaOrdine> quote) {
+        boolean dividi = quote.size() > 1;
+        righeQuoteProfili.setAll(costiPerOrdine(quote, QuotaOrdine::costoProfili));
+        righeQuoteVetri.setAll(costiPerOrdine(quote, QuotaOrdine::costoVetro));
+        boolean vetroDaMostrare = dividi && righeQuoteVetri.stream().anyMatch(voce -> voce.costo() > 0);
+        // Nascondere senza "managed" lascerebbe il buco vuoto nello SplitPane.
+        boxQuoteProfili.setVisible(dividi);
+        boxQuoteProfili.setManaged(dividi);
+        boxQuoteVetri.setVisible(vetroDaMostrare);
+        boxQuoteVetri.setManaged(vetroDaMostrare);
+    }
+
+    /** Una voce per ordine più la riga del totale, con la stessa somma dei totali complessivi. */
+    private static List<CostoOrdine> costiPerOrdine(List<QuotaOrdine> quote,
+            ToDoubleFunction<QuotaOrdine> costo) {
+        List<CostoOrdine> voci = new ArrayList<>(quote.stream()
+                .map(quota -> new CostoOrdine(quota.ordine(), costo.applyAsDouble(quota), false))
+                .toList());
+        voci.add(new CostoOrdine("TOTALE", quote.stream().mapToDouble(costo).sum(), true));
+        return voci;
     }
 
     /**
@@ -353,19 +453,21 @@ public final class SchermataRisultati {
                 : preventivo.totaleLastre() + " lastre da ordinare, "
                         + mq(preventivo.areaVetroTotaleMq()) + " mq di superficie in "
                         + preventivo.righeVetro().size() + " misure diverse"
-                        + (preventivo.prezzi().alMqVetro() > 0
+                        + (preventivo.costoVetro() > 0
                                 ? ", per " + euro(preventivo.costoVetro()) + "."
                                 : "."));
     }
 
-    /** Il calcolo globale: piano unico degli ordini evasi, magazzino già aggiornato. */
+    /**
+     * Il calcolo globale: la distinta <b>unita</b> degli ordini evasi (cosa tagliare), il piano unico
+     * (come sistemarlo sulle barre), gli sfridi e il preventivo. Magazzino già aggiornato.
+     */
     public void mostraEvasione(EvasioneOrdini evasione) {
+        mostraDistinta(evasione.distinte());
         mostraPiano(evasione.piano());
         mostraSfridi(evasione.piano());
+        mostraDivisione(evasione.quote());
         mostraPreventivo(evasione.preventivoTotale());
-        righeDistinta.clear();
-        riepilogoDistinta.setText("Il calcolo globale non produce una distinta per ordine: "
-                + "i pezzi di tutti gli ordini sono impacchettati insieme.");
         titolo.setText("Calcolo globale di " + evasione.ordini().size()
                 + " ordini - magazzino aggiornato: "
                 + evasione.magazzinoAggiornato().stream().mapToInt(Avanzo::quantita).sum()

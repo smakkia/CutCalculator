@@ -5,6 +5,7 @@ import com.cutcalculator.catalogo.Catalogo;
 import com.cutcalculator.catalogo.Sistema;
 import com.cutcalculator.dominio.Colore;
 import com.cutcalculator.dominio.Dimensione;
+import com.cutcalculator.dominio.Prezzi;
 import com.cutcalculator.dominio.Serramento;
 import com.cutcalculator.dominio.Tipologia;
 import javafx.fxml.FXML;
@@ -34,6 +35,8 @@ public final class SchermataSerramento {
     @FXML private TextField campoL;
     @FXML private TextField campoH;
     @FXML private TextField campoHF;
+    @FXML private TextField campoPrezzoKg;
+    @FXML private TextField campoPrezzoMq;
     @FXML private Label etichettaL;
     @FXML private Label etichettaH;
     @FXML private Label etichettaHF;
@@ -50,9 +53,17 @@ public final class SchermataSerramento {
         sceltaTipologia.valueProperty().addListener((osservabile, prima, adesso) -> abilitaHF(adesso));
     }
 
-    /** Riempie le scelte col catalogo dell'app e adotta l'unità di misura scelta dall'utente. */
-    public void inizializza(Catalogo catalogo, Unita unita) {
+    /**
+     * Riempie le scelte col catalogo dell'app, adotta l'unità di misura scelta dall'utente e
+     * propone i prezzi dell'impostazione generale — che restano modificabili, perché il €/kg e il
+     * €/mq cambiano con la finitura scelta qui accanto.
+     */
+    public void inizializza(Catalogo catalogo, Unita unita, Prezzi predefiniti) {
         this.unita = unita;
+        campoPrezzoKg.setText(predefiniti.alChiloBarre() > 0
+                ? String.valueOf(predefiniti.alChiloBarre()) : "");
+        campoPrezzoMq.setText(predefiniti.alMqVetro() > 0
+                ? String.valueOf(predefiniti.alMqVetro()) : "");
         sceltaSistema.getItems().setAll(catalogo.sistemi());
         sceltaSistema.getSelectionModel().selectFirst();
         campoL.setPromptText(unita.simbolo());
@@ -110,7 +121,14 @@ public final class SchermataSerramento {
             }
             hf = parziale.getAsDouble();
         }
+        OptionalDouble alKg = Campi.prezzo(campoPrezzoKg);
+        OptionalDouble alMq = Campi.prezzo(campoPrezzoMq);
+        if (alKg.isEmpty() || alMq.isEmpty()) {
+            Dialoghi.errore("Prezzi non validi", Campi.PREZZO_NON_VALIDO);
+            return Optional.empty();
+        }
         return Optional.of(new Serramento(tipologia, colore.get(),
-                new Dimensione(l.getAsDouble(), h.getAsDouble(), hf), campoQuantita.getValue()));
+                new Dimensione(l.getAsDouble(), h.getAsDouble(), hf), campoQuantita.getValue(),
+                new Prezzi(alKg.getAsDouble(), alMq.getAsDouble())));
     }
 }

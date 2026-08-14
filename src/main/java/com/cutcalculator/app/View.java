@@ -3,8 +3,8 @@ package com.cutcalculator.app;
 import com.cutcalculator.catalogo.Catalogo;
 import com.cutcalculator.dominio.Avanzo;
 import com.cutcalculator.dominio.Ordine;
-import com.cutcalculator.formule.Distinta;
 import com.cutcalculator.ottimizzatore.PianoDiTaglio;
+import com.cutcalculator.pianificazione.DistintaOrdine;
 import com.cutcalculator.pianificazione.EvasioneOrdini;
 import com.cutcalculator.preventivo.Preventivo;
 
@@ -33,7 +33,8 @@ public interface View {
 
     void magazzino(List<Avanzo> avanzi);
 
-    void distinta(Distinta distinta);
+    /** I pezzi da tagliare, <b>raggruppati per ordine</b> come il piano lo è per barra. */
+    void distinta(List<DistintaOrdine> distinte);
 
     void piano(PianoDiTaglio piano);
 

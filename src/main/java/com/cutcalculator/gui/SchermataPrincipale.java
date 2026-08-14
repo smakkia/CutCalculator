@@ -6,18 +6,18 @@ import com.cutcalculator.catalogo.Catalogo;
 import com.cutcalculator.catalogo.Sistema;
 import com.cutcalculator.dominio.Ordine;
 import com.cutcalculator.dominio.Tipologia;
-import com.cutcalculator.formule.Distinta;
 import com.cutcalculator.ottimizzatore.PianoDiTaglio;
+import com.cutcalculator.pianificazione.DistintaOrdine;
 import com.cutcalculator.pianificazione.EvasioneOrdini;
 import com.cutcalculator.preventivo.Preventivo;
 import javafx.fxml.FXML;
 import javafx.scene.control.Menu;
-import javafx.scene.control.MenuItem;
 import javafx.scene.control.RadioMenuItem;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.ToggleGroup;
 
+import java.util.List;
 import java.util.stream.Collectors;
 
 /**
@@ -36,8 +36,6 @@ public final class SchermataPrincipale {
     @FXML private Tab schedaMagazzino;
     @FXML private Tab schedaOrdini;
     @FXML private Tab schedaRisultati;
-    @FXML private MenuItem voceSalvaOrdini;
-    @FXML private MenuItem voceCaricaOrdini;
     @FXML private Menu menuUnita;
 
     // Iniettati da fx:include: <fx:id>Controller
@@ -53,11 +51,24 @@ public final class SchermataPrincipale {
         magazzinoController.inizializza(controller);
         ordiniController.inizializza(controller, this);
         risultatiController.inizializza(controller);
-        boolean persistenza = controller.persistenzaOrdiniAttiva();
-        voceSalvaOrdini.setDisable(!persistenza);
-        voceCaricaOrdini.setDisable(!persistenza);
         costruisciMenuUnita();
         schede.getSelectionModel().select(schedaMagazzino);   // tab d'apertura, esplicito
+        avvisaRigheScartate();
+    }
+
+    /**
+     * Avvisa se il file ordini conteneva righe illeggibili. Da quando gli ordini si risalvano da
+     * soli, tacere non basta più: la prima modifica riscriverebbe il file senza quelle righe.
+     */
+    private void avvisaRigheScartate() {
+        int scartate = controller.righeOrdiniScartate();
+        if (scartate > 0) {
+            Dialoghi.errore("File ordini incompleto",
+                    scartate + " righe del file ordini non sono state riconosciute (tipologia non "
+                            + "più nel catalogo, o dati malformati).\n\nVerranno perse alla prima "
+                            + "modifica, perché gli ordini si risalvano da soli: correggi "
+                            + "dati/ordini.csv prima di continuare.");
+        }
     }
 
     /**
@@ -93,41 +104,16 @@ public final class SchermataPrincipale {
         javafx.application.Platform.exit();
     }
 
-    @FXML
-    private void salvaOrdini() {
-        controller.salvaOrdini();
-        Dialoghi.informa("Ordini salvati",
-                controller.ordini().size() + " ordini salvati su file.");
-    }
-
-    @FXML
-    private void caricaOrdini() {
-        boolean conferma = controller.ordini().isEmpty() || Dialoghi.conferma("Carica ordini da file",
-                "Gli ordini in memoria verranno sostituiti da quelli su file. Procedo?");
-        if (!conferma) {
-            return;
-        }
-        int caricati = controller.caricaOrdini();
-        ordiniController.aggiorna();
-        Dialoghi.informa("Ordini caricati", caricati + " ordini caricati da file.");
-    }
+    // Salva/carica ordini a comando non ci sono piu': gli ordini si salvano da soli a ogni
+    // modifica, come il magazzino, e si ricaricano all'avvio.
 
     @FXML
     private void apriCatalogo() {
         mostraCatalogo(controller.catalogo());
     }
 
-    /**
-     * Il listino (€/kg dell'alluminio, €/mq del vetro). Cambiandolo si rifà solo la vista dei
-     * risultati: i costi sono derivati, quindi basta ricalcolarli sull'ultimo preventivo mostrato.
-     */
-    @FXML
-    private void apriPrezzi() {
-        DialogoPrezzi.chiedi(controller.prezzi()).ifPresent(prezzi -> {
-            controller.impostaPrezzi(prezzi);
-            risultatiController.aggiornaPrezzi();
-        });
-    }
+    // I prezzi non hanno più una voce di menu: si dichiarano su ogni serramento, dove si sceglie
+    // anche il colore da cui dipendono.
 
     // --- Viste (chiamate da GuiFx) -----------------------------------------------------
 
@@ -158,8 +144,8 @@ public final class SchermataPrincipale {
         schede.getSelectionModel().select(schedaOrdini);
     }
 
-    public void mostraDistinta(Distinta distinta) {
-        risultatiController.mostraDistinta(distinta);
+    public void mostraDistinta(List<DistintaOrdine> distinte) {
+        risultatiController.mostraDistinta(distinte);
         schede.getSelectionModel().select(schedaRisultati);
     }
 

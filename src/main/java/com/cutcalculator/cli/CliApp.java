@@ -3,6 +3,7 @@ package com.cutcalculator.cli;
 import com.cutcalculator.app.Controller;
 import com.cutcalculator.app.View;
 import com.cutcalculator.catalogo.Catalogo;
+import com.cutcalculator.persistenza.ArchivioCalcoli;
 import com.cutcalculator.persistenza.ArchivioImpostazioni;
 import com.cutcalculator.persistenza.ArchivioMagazzino;
 import com.cutcalculator.persistenza.ArchivioOrdini;
@@ -15,15 +16,16 @@ import java.util.Scanner;
  * {@link Catalogo#completo() catalogo completo}, con il magazzino persistito su disco) e la
  * view ({@link CliView} sullo stdin), poi avvia l'interazione. È solo il "wiring": nessuna logica.
  * <p>
- * Il magazzino vive in {@code dati/magazzino.csv} (nella cartella di lavoro): viene caricato
- * all'avvio e risalvato a ogni modifica. Gli ordini vivono in {@code dati/ordini.csv} e si
- * salvano/caricano <b>su comando</b> dal menu Ordini. Avvio: {@code mvn compile exec:java}.
+ * Tutto vive nella cartella {@code dati/} (relativa alla cartella di lavoro): magazzino, ordini e
+ * impostazioni si caricano all'avvio e si risalvano a ogni modifica; i risultati di ogni calcolo
+ * globale finiscono nei {@code calcoli-*.csv}. Avvio: {@code mvn compile exec:java}.
  */
 public final class CliApp {
 
-    private static final Path FILE_MAGAZZINO = Path.of("dati", "magazzino.csv");
-    private static final Path FILE_ORDINI = Path.of("dati", "ordini.csv");
-    private static final Path FILE_IMPOSTAZIONI = Path.of("dati", "impostazioni.properties");
+    private static final Path CARTELLA_DATI = Path.of("dati");
+    private static final Path FILE_MAGAZZINO = CARTELLA_DATI.resolve("magazzino.csv");
+    private static final Path FILE_ORDINI = CARTELLA_DATI.resolve("ordini.csv");
+    private static final Path FILE_IMPOSTAZIONI = CARTELLA_DATI.resolve("impostazioni.properties");
 
     private CliApp() {
     }
@@ -33,7 +35,8 @@ public final class CliApp {
         ArchivioMagazzino archivio = new ArchivioMagazzino(FILE_MAGAZZINO, catalogo);
         ArchivioOrdini archivioOrdini = new ArchivioOrdini(FILE_ORDINI, catalogo);
         ArchivioImpostazioni impostazioni = new ArchivioImpostazioni(FILE_IMPOSTAZIONI);
+        ArchivioCalcoli calcoli = new ArchivioCalcoli(CARTELLA_DATI);
         View view = new CliView(new Scanner(System.in));
-        view.avvia(new Controller(catalogo, archivio, archivioOrdini, impostazioni));
+        view.avvia(new Controller(catalogo, archivio, archivioOrdini, impostazioni, calcoli));
     }
 }

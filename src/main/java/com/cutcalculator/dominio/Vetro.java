@@ -22,15 +22,27 @@ package com.cutcalculator.dominio;
  * @param lunghezza il lato della lastra ricavato dall'altezza H (mm)
  * @param larghezza il lato della lastra ricavato dalla larghezza L (mm)
  * @param quantita  quante lastre identiche servono
+ * @param prezzi    il listino del {@link Serramento} da cui vengono: il €/mq cambia col tipo di
+ *                  vetro richiesto, quindi ogni riga si porta dietro il proprio
  */
-public record Vetro(double lunghezza, double larghezza, int quantita) {
+public record Vetro(double lunghezza, double larghezza, int quantita, Prezzi prezzi) {
 
     /** Millimetri quadri in un metro quadro: 1 m² = 1000 mm × 1000 mm. */
     private static final double MMQ_PER_MQ = 1_000_000.0;
 
+    /** Senza listino: la lastra si può ordinare ma non valorizzare. */
+    public Vetro(double lunghezza, double larghezza, int quantita) {
+        this(lunghezza, larghezza, quantita, Prezzi.NESSUNO);
+    }
+
     /** Comodo per la lastra singola. */
     public Vetro(double lunghezza, double larghezza) {
         this(lunghezza, larghezza, 1);
+    }
+
+    /** Il costo di queste lastre: superficie × €/mq del serramento da cui vengono. */
+    public double costo() {
+        return prezzi.costoVetro(areaTotaleMq());
     }
 
     /** Area di <b>una</b> lastra, in mm². */

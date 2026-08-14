@@ -4,11 +4,14 @@ import com.cutcalculator.catalogo.Catalogo;
 import com.cutcalculator.dominio.Avanzo;
 import com.cutcalculator.dominio.Ordine;
 import com.cutcalculator.dominio.Prezzi;
+import com.cutcalculator.dominio.Serramento;
 import com.cutcalculator.formule.Distinta;
 import com.cutcalculator.formule.GeneratoreDistinta;
 import com.cutcalculator.ottimizzatore.BestFitDecreasing;
 import com.cutcalculator.ottimizzatore.PianoDiTaglio;
+import com.cutcalculator.persistenza.ArchivioCalcoli;
 import com.cutcalculator.persistenza.ArchivioImpostazioni;
+import com.cutcalculator.persistenza.CalcoloOrdine;
 import com.cutcalculator.persistenza.ArchivioMagazzino;
 import com.cutcalculator.persistenza.ArchivioOrdini;
 import com.cutcalculator.pianificazione.EvasioneOrdini;
@@ -35,10 +38,10 @@ public final class Controller {
     private final ArchivioMagazzino archivio;
     private final ArchivioOrdini archivioOrdini;
     private final ArchivioImpostazioni archivioImpostazioni;
+    private final ArchivioCalcoli archivioCalcoli;
     private final List<Avanzo> magazzino = new ArrayList<>();
     private final List<Ordine> ordini = new ArrayList<>();
     private Unita unita = Unita.PREDEFINITA;
-    private Prezzi prezzi = Prezzi.NESSUNO;
 
     /** Solo in memoria, senza persistenza: comodo per test o usi effimeri. */
     public Controller(Catalogo catalogo) {
@@ -56,24 +59,34 @@ public final class Controller {
     }
 
     /**
-     * Collega gli archivi su disco. Il <b>magazzino</b> viene caricato all'avvio e risalvato a ogni
-     * modifica ({@code archivio}). Gli <b>ordini</b> non si caricano da soli: il salvataggio e il
-     * caricamento sono <b>su comando</b> ({@link #salvaOrdini()} / {@link #caricaOrdini()}). Le
-     * <b>impostazioni</b> (oggi la sola {@link Unita unità di misura}) si caricano all'avvio e si
-     * salvano a ogni cambio. Con un archivio null la rispettiva persistenza è disattivata.
+     * Collega gli archivi su disco. <b>Magazzino</b>, <b>ordini</b> e <b>impostazioni</b> si caricano
+     * all'avvio e si risalvano a ogni modifica: chiudere l'applicazione non perde niente. Con un
+     * archivio null la rispettiva persistenza è disattivata e quei dati restano solo in memoria.
      */
     public Controller(Catalogo catalogo, ArchivioMagazzino archivio, ArchivioOrdini archivioOrdini,
             ArchivioImpostazioni archivioImpostazioni) {
+        this(catalogo, archivio, archivioOrdini, archivioImpostazioni, null);
+    }
+
+    /**
+     * Come sopra, più l'{@link ArchivioCalcoli}: a ogni calcolo globale, distinta, preventivo e vetri
+     * di ogni ordine evaso vengono scritti su disco e restano consultabili anche dopo la chiusura.
+     */
+    public Controller(Catalogo catalogo, ArchivioMagazzino archivio, ArchivioOrdini archivioOrdini,
+            ArchivioImpostazioni archivioImpostazioni, ArchivioCalcoli archivioCalcoli) {
         this.catalogo = catalogo;
         this.archivio = archivio;
         this.archivioOrdini = archivioOrdini;
         this.archivioImpostazioni = archivioImpostazioni;
+        this.archivioCalcoli = archivioCalcoli;
         if (archivio != null) {
             magazzino.addAll(archivio.carica());
         }
+        if (archivioOrdini != null) {
+            ordini.addAll(archivioOrdini.carica());
+        }
         if (archivioImpostazioni != null) {
             unita = archivioImpostazioni.caricaUnita();
-            prezzi = archivioImpostazioni.caricaPrezzi();
         }
     }
 
@@ -95,22 +108,8 @@ public final class Controller {
         }
     }
 
-    /**
-     * Il listino con cui valorizzare il preventivo (€/kg dell'alluminio, €/mq del vetro). È un dato
-     * dell'utente, non del catalogo: finché non lo imposta vale {@link Prezzi#NESSUNO} e i costi
-     * vengono zero.
-     */
-    public Prezzi prezzi() {
-        return prezzi;
-    }
-
-    /** Cambia il listino e lo persiste, se c'è un archivio impostazioni collegato. */
-    public void impostaPrezzi(Prezzi prezzi) {
-        this.prezzi = prezzi;
-        if (archivioImpostazioni != null) {
-            archivioImpostazioni.salvaPrezzi(prezzi);
-        }
-    }
+    // I prezzi non sono un'impostazione: si dichiarano su ogni Serramento, dove si sceglie anche il
+    // colore da cui dipendono. Le UI propongono quelli dell'ultimo serramento inserito.
 
     // --- Lettura dello stato -----------------------------------------------------------
 
@@ -203,11 +202,44 @@ public final class Controller {
     public Ordine nuovoOrdine(String nome) {
         Ordine ordine = new Ordine(nome);
         ordini.add(ordine);
+        salvaOrdini();
         return ordine;
     }
 
     public void rimuoviOrdine(Ordine ordine) {
         ordini.remove(ordine);
+        salvaOrdini();
+    }
+
+    /**
+     * Aggiunge un serramento a un ordine e <b>persiste</b>.
+     * <p>
+     * Le modifiche ai serramenti passano di qui e non direttamente dall'{@link Ordine}, che pure
+     * sarebbe capace di farle: è l'unico modo perché il salvataggio automatico se ne accorga. La
+     * regola è la stessa del magazzino — lo stato lo possiede il controller, le view glielo chiedono
+     * e gli delegano le modifiche.
+     */
+    public void aggiungiSerramento(Ordine ordine, Serramento serramento) {
+        ordine.aggiungi(serramento);
+        salvaOrdini();
+    }
+
+    /** Toglie il serramento alla posizione data e persiste. */
+    public void rimuoviSerramento(Ordine ordine, int indice) {
+        ordine.rimuovi(indice);
+        salvaOrdini();
+    }
+
+    /** Sostituisce un serramento con la versione corretta e persiste. */
+    public void sostituisciSerramento(Ordine ordine, int indice, Serramento serramento) {
+        ordine.sostituisci(indice, serramento);
+        salvaOrdini();
+    }
+
+    /** Rinomina l'ordine e persiste (il nome non cambia lo stato di calcolo). */
+    public void rinominaOrdine(Ordine ordine, String nome) {
+        ordine.rinomina(nome);
+        salvaOrdini();
     }
 
     /** {@code true} se c'è un archivio ordini collegato (salvataggio/caricamento disponibili). */
@@ -215,7 +247,19 @@ public final class Controller {
         return archivioOrdini != null;
     }
 
-    /** Salva su disco tutti gli ordini correnti; no-op se non c'è un archivio collegato. */
+    /**
+     * Quante righe del file ordini l'ultimo caricamento non ha saputo interpretare: righe che il
+     * prossimo salvataggio automatico farebbe sparire. Le UI lo dicono all'avvio — zero significa
+     * che il file è stato letto per intero.
+     */
+    public int righeOrdiniScartate() {
+        return archivioOrdini == null ? 0 : archivioOrdini.righeScartate();
+    }
+
+    /**
+     * Salva su disco tutti gli ordini correnti; no-op se non c'è un archivio collegato. Lo chiamano
+     * da sole tutte le operazioni che toccano gli ordini: non è un comando dell'utente.
+     */
     public void salvaOrdini() {
         if (archivioOrdini != null) {
             archivioOrdini.salva(ordini);
@@ -255,8 +299,18 @@ public final class Controller {
         Distinta distinta = new GeneratoreDistinta().genera(ordine);
         PianoDiTaglio piano = new BestFitDecreasing().ottimizza(distinta, magazzino);
         Preventivo preventivo = new GeneratorePreventivo()
-                .genera(piano, distinta.vetri(), sogliaRitaglio(), prezzi);
+                .genera(piano, distinta.vetri(), sogliaRitaglio());
         return new Risultato(distinta, piano, preventivo);
+    }
+
+    /**
+     * I documenti dell'ultimo calcolo di quest'ordine — distinta, preventivo, vetri e costo — riletti
+     * da disco. Vuoto se l'ordine non è mai stato calcolato o se non c'è un archivio collegato.
+     */
+    public CalcoloOrdine calcoloDi(Ordine ordine) {
+        return archivioCalcoli == null
+                ? new CalcoloOrdine(ordine.nome(), List.of(), List.of(), List.of())
+                : archivioCalcoli.carica(ordine.nome());
     }
 
     /** La soglia (mm) sopra cui un ritaglio rientra in magazzino come nuovo avanzo. */
@@ -277,11 +331,15 @@ public final class Controller {
      */
     public EvasioneOrdini evadiOrdini() {
         List<Ordine> daCalcolare = ordiniDaCalcolare();
-        EvasioneOrdini evasione = new PianificatoreOrdini().pianifica(daCalcolare, magazzino, prezzi);
+        EvasioneOrdini evasione = new PianificatoreOrdini().pianifica(daCalcolare, magazzino);
         magazzino.clear();
         magazzino.addAll(evasione.magazzinoAggiornato());
         salva();
         daCalcolare.forEach(Ordine::segnaCalcolato);
+        salvaOrdini();   // e' cambiato lo stato: sono passati tra i calcolati
+        if (archivioCalcoli != null) {
+            archivioCalcoli.salva(evasione);   // distinta, preventivo e vetri di ogni ordine evaso
+        }
         return evasione;
     }
 

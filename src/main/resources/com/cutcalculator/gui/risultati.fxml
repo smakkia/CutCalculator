@@ -8,6 +8,7 @@
 <?import javafx.scene.control.TableView?>
 <?import javafx.scene.control.TreeTableColumn?>
 <?import javafx.scene.control.TreeTableView?>
+<?import javafx.scene.control.SplitPane?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.VBox?>
 
@@ -29,14 +30,14 @@
                     <content>
                         <BorderPane>
                             <center>
-                                <TableView fx:id="tabellaDistinta">
+                                <TreeTableView fx:id="alberoDistinta">
                                     <columns>
-                                        <TableColumn fx:id="distintaMateriale" text="Materiale" prefWidth="420.0"/>
-                                        <TableColumn fx:id="distintaLunghezza" text="Lunghezza (mm)" prefWidth="140.0"/>
-                                        <TableColumn fx:id="distintaTaglio" text="Taglio" prefWidth="120.0"/>
-                                        <TableColumn fx:id="distintaQuantita" text="Quantita'" prefWidth="90.0"/>
+                                        <TreeTableColumn fx:id="distintaMateriale" text="Ordine / materiale" prefWidth="420.0"/>
+                                        <TreeTableColumn fx:id="distintaLunghezza" text="Lunghezza (mm)" prefWidth="140.0"/>
+                                        <TreeTableColumn fx:id="distintaTaglio" text="Taglio" prefWidth="120.0"/>
+                                        <TreeTableColumn fx:id="distintaQuantita" text="Quantita'" prefWidth="90.0"/>
                                     </columns>
-                                </TableView>
+                                </TreeTableView>
                             </center>
                             <bottom>
                                 <Label fx:id="riepilogoDistinta" text="">
@@ -89,6 +90,8 @@
                     <content>
                         <BorderPane>
                             <center>
+                                <SplitPane orientation="VERTICAL" dividerPositions="0.55">
+                                    <items>
                                 <TableView fx:id="tabellaPreventivo">
                                     <columns>
                                         <TableColumn fx:id="preventivoProfilo" text="Profilo" prefWidth="320.0"/>
@@ -103,6 +106,24 @@
                                         <TableColumn fx:id="preventivoCosto" text="Costo" prefWidth="110.0"/>
                                     </columns>
                                 </TableView>
+                                <VBox fx:id="boxQuoteProfili" spacing="4.0">
+                                    <children>
+                                        <Label text="Quota per ordine - le barre sono condivise, quindi peso e costo si dividono in proporzione ai mm tagliati (sfrido compreso)"
+                                               wrapText="true">
+                                            <padding>
+                                                <Insets top="8.0" right="12.0" bottom="2.0" left="12.0"/>
+                                            </padding>
+                                        </Label>
+                                        <TableView fx:id="tabellaQuoteProfili" VBox.vgrow="ALWAYS">
+                                            <columns>
+                                                <TableColumn fx:id="quotaOrdine" text="Ordine" prefWidth="420.0"/>
+                                                <TableColumn fx:id="quotaCosto" text="Costo profili" prefWidth="160.0"/>
+                                            </columns>
+                                        </TableView>
+                                    </children>
+                                </VBox>
+                                    </items>
+                                </SplitPane>
                             </center>
                             <bottom>
                                 <VBox spacing="4.0">
@@ -122,16 +143,36 @@
                     <content>
                         <BorderPane>
                             <center>
-                                <TableView fx:id="tabellaVetri">
-                                    <columns>
-                                        <TableColumn fx:id="vetriAltezza" text="Altezza H (mm)" prefWidth="180.0"/>
-                                        <TableColumn fx:id="vetriLarghezza" text="Larghezza L (mm)" prefWidth="180.0"/>
-                                        <TableColumn fx:id="vetriQuantita" text="Quantita'" prefWidth="110.0"/>
-                                        <TableColumn fx:id="vetriAreaLastra" text="Area lastra (mq)" prefWidth="160.0"/>
-                                        <TableColumn fx:id="vetriAreaTotale" text="Area totale (mq)" prefWidth="160.0"/>
-                                        <TableColumn fx:id="vetriCosto" text="Costo" prefWidth="120.0"/>
-                                    </columns>
-                                </TableView>
+                                <SplitPane orientation="VERTICAL" dividerPositions="0.55">
+                                    <items>
+                                        <TableView fx:id="tabellaVetri">
+                                            <columns>
+                                                <TableColumn fx:id="vetriAltezza" text="Altezza H (mm)" prefWidth="180.0"/>
+                                                <TableColumn fx:id="vetriLarghezza" text="Larghezza L (mm)" prefWidth="180.0"/>
+                                                <TableColumn fx:id="vetriQuantita" text="Quantita'" prefWidth="110.0"/>
+                                                <TableColumn fx:id="vetriAreaLastra" text="Area lastra (mq)" prefWidth="160.0"/>
+                                                <TableColumn fx:id="vetriAreaTotale" text="Area totale (mq)" prefWidth="160.0"/>
+                                                <TableColumn fx:id="vetriCosto" text="Costo" prefWidth="120.0"/>
+                                            </columns>
+                                        </TableView>
+                                        <VBox fx:id="boxQuoteVetri" spacing="4.0">
+                                            <children>
+                                                <Label text="Per ordine - le lastre non si condividono, quindi qui la divisione e' esatta"
+                                                       wrapText="true">
+                                                    <padding>
+                                                        <Insets top="8.0" right="12.0" bottom="2.0" left="12.0"/>
+                                                    </padding>
+                                                </Label>
+                                                <TableView fx:id="tabellaQuoteVetri" VBox.vgrow="ALWAYS">
+                                                    <columns>
+                                                        <TableColumn fx:id="quotaVetroOrdine" text="Ordine" prefWidth="420.0"/>
+                                                        <TableColumn fx:id="quotaVetroCosto" text="Costo vetro" prefWidth="160.0"/>
+                                                    </columns>
+                                                </TableView>
+                                            </children>
+                                        </VBox>
+                                    </items>
+                                </SplitPane>
                             </center>
                             <bottom>
                                 <Label fx:id="totaliVetri" text="">

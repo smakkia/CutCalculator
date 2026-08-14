@@ -90,6 +90,7 @@
                     <children>
                         <Button text="Aggiungi serramento" onAction="#aggiungiSerramento"/>
                         <Button text="Rimuovi selezionato" onAction="#rimuoviSerramento"/>
+                        <Button text="Vedi calcolo dell'ordine" onAction="#vediCalcolo"/>
                     </children>
                 </HBox>
             </bottom>

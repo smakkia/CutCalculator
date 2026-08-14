@@ -30,14 +30,16 @@ public class GeneratoreDistinta {
                 double lunghezza = regola.lunghezza(serramento.dimensione());
                 int quantita = regola.quantita() * serramento.quantita();
                 for (int i = 0; i < quantita; i++) {
+                    // Il listino viaggia col pezzo: due serramenti dello stesso profilo possono
+                    // avere prezzi diversi (colori diversi), e il costo va calcolato con il suo.
                     pezzi.add(new Pezzo(regola.profilo(), serramento.colore(), lunghezza,
-                            regola.tipoTaglio(), regola.descrizione()));
+                            regola.tipoTaglio(), regola.descrizione(), serramento.prezzi()));
                 }
             }
             for (RegolaVetro regola : serramento.tipologia().regoleVetro()) {
                 Vetro lastra = regola.calcola(serramento.dimensione());
                 vetri.add(new Vetro(lastra.lunghezza(), lastra.larghezza(),
-                        lastra.quantita() * serramento.quantita()));
+                        lastra.quantita() * serramento.quantita(), serramento.prezzi()));
             }
         }
         return new Distinta(pezzi, vetri);

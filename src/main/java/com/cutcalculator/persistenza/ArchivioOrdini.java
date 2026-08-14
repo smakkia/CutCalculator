@@ -5,6 +5,7 @@ import com.cutcalculator.catalogo.Sistema;
 import com.cutcalculator.dominio.Colore;
 import com.cutcalculator.dominio.Dimensione;
 import com.cutcalculator.dominio.Ordine;
+import com.cutcalculator.dominio.Prezzi;
 import com.cutcalculator.dominio.Serramento;
 import com.cutcalculator.dominio.Tipologia;
 
@@ -22,7 +23,7 @@ import java.util.Optional;
 /**
  * Archivio su disco degli ordini: carica e salva la lista di {@link Ordine} in un CSV semplice, una
  * riga per {@link Serramento} nel formato
- * {@code ordine;sistema;tipologia;colore;L;H;HF;quantita;calcolato}.
+ * {@code ordine;sistema;tipologia;colore;L;H;HF;quantita;calcolato;prezzoKg;prezzoMq}.
  * <p>
  * L'ultimo campo ({@code 1}/{@code 0}) dice se l'ordine è <b>già stato calcolato</b>: senza di lui,
  * ricaricando il file gli ordini evasi tornerebbero "da calcolare" e il calcolo globale scalerebbe
@@ -50,6 +51,7 @@ public final class ArchivioOrdini {
 
     private final Path file;
     private final Catalogo catalogo;
+    private int righeScartate;
 
     public ArchivioOrdini(Path file, Catalogo catalogo) {
         this.file = file;
@@ -58,6 +60,7 @@ public final class ArchivioOrdini {
 
     /** Carica gli ordini dal file; lista vuota se il file non esiste ancora. */
     public List<Ordine> carica() {
+        righeScartate = 0;
         if (!Files.exists(file)) {
             return new ArrayList<>();
         }
@@ -70,6 +73,19 @@ public final class ArchivioOrdini {
             throw new UncheckedIOException("Impossibile leggere gli ordini da " + file, lettura);
         }
         return new ArrayList<>(perNome.values());
+    }
+
+    /**
+     * Quante righe con contenuto l'ultimo {@link #carica()} <b>non</b> ha saputo interpretare — di
+     * solito una tipologia che nel catalogo non esiste più, o un numero scritto male.
+     * <p>
+     * Scartarle è voluto (un file corretto a mano non deve far crashare l'app), ma da quando gli
+     * ordini si <b>risalvano da soli</b> il silenzio non basta più: la prima modifica riscrive il
+     * file senza quelle righe, e il dato è perso per sempre. Le UI lo dicono all'avvio, così c'è il
+     * tempo di sistemare il file prima che venga riscritto.
+     */
+    public int righeScartate() {
+        return righeScartate;
     }
 
     /** Salva tutti gli ordini sovrascrivendo il file (crea le cartelle mancanti). */
@@ -90,7 +106,9 @@ public final class ArchivioOrdini {
                 righe.add(String.join(SEP, ordine.nome(), sistema, serramento.tipologia().nome(),
                         serramento.colore().nome(), Double.toString(d.L()), Double.toString(d.H()),
                         Double.toString(d.HF()), Integer.toString(serramento.quantita()),
-                        ordine.calcolato() ? CALCOLATO : DA_CALCOLARE));
+                        ordine.calcolato() ? CALCOLATO : DA_CALCOLARE,
+                        Double.toString(serramento.prezzi().alChiloBarre()),
+                        Double.toString(serramento.prezzi().alMqVetro())));
             }
         }
         try {
@@ -119,17 +137,21 @@ public final class ArchivioOrdini {
             perNome.computeIfAbsent(nome, Ordine::new);   // ordine vuoto
             return;
         }
-        if (campi.length != 8 && campi.length != 9) {
+        if (campi.length != 8 && campi.length != 9 && campi.length != 11) {
+            righeScartate++;
             return;
         }
         Serramento serramento = leggiSerramento(campi);
         if (serramento == null) {
+            righeScartate++;
             return;
         }
         Ordine ordine = perNome.computeIfAbsent(nome, Ordine::new);
         ordine.aggiungi(serramento);   // rimette l'ordine tra quelli da calcolare...
-        if (campi.length == 9 && CALCOLATO.equals(campi[8].trim())) {
-            ordine.segnaCalcolato();   // ...quindi lo stato salvato si riapplica dopo
+        // ...quindi lo stato salvato si riapplica dopo. Il flag è il 9° campo sia nel formato a 9
+        // sia in quello a 11 (con i prezzi in coda): guardarlo solo nel primo lo perdeva.
+        if (campi.length >= 9 && CALCOLATO.equals(campi[8].trim())) {
+            ordine.segnaCalcolato();
         }
     }
 
@@ -149,9 +171,23 @@ public final class ArchivioOrdini {
             if (l <= 0 || h <= 0 || hf < 0 || quantita <= 0) {
                 return null;
             }
-            return new Serramento(tipologia.get(), colore, new Dimensione(l, h, hf), quantita);
+            // I prezzi (campi 9-10) sono arrivati dopo: i file più vecchi non li hanno e valgono 0.
+            Prezzi prezzi = campi.length == 11
+                    ? new Prezzi(prezzo(campi[9]), prezzo(campi[10]))
+                    : Prezzi.NESSUNO;
+            return new Serramento(tipologia.get(), colore, new Dimensione(l, h, hf), quantita, prezzi);
         } catch (IllegalArgumentException malformata) {
             return null;
+        }
+    }
+
+    /** Un prezzo scritto nel file: malformato o negativo vale 0 (non impostato), non un errore. */
+    private static double prezzo(String campo) {
+        try {
+            double letto = Double.parseDouble(campo.trim().replace(',', '.'));
+            return letto > 0 ? letto : 0;
+        } catch (NumberFormatException nonUnNumero) {
+            return 0;
         }
     }
 

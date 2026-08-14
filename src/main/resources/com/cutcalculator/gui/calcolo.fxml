@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TabPane?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.VBox?>
+
+<!--
+  I documenti di un ordine gia' calcolato, riletti da disco: distinta, preventivo e vetri in tre
+  tab, col prezzo dell'ordine sempre in vista sotto. Stesso stile del tab Risultati.
+-->
+<BorderPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+            fx:controller="com.cutcalculator.gui.SchermataCalcolo"
+            prefWidth="820.0" prefHeight="520.0">
+    <top>
+        <Label fx:id="avviso" text="" wrapText="true" style="-fx-text-fill: #b34700;">
+            <padding>
+                <Insets top="10.0" right="12.0" bottom="4.0" left="12.0"/>
+            </padding>
+        </Label>
+    </top>
+    <center>
+        <TabPane tabClosingPolicy="UNAVAILABLE">
+            <tabs>
+                <Tab text="Distinta">
+                    <content>
+                        <TableView fx:id="tabellaDistinta">
+                            <columns>
+                                <TableColumn fx:id="distintaProfilo" text="Profilo" prefWidth="160.0"/>
+                                <TableColumn fx:id="distintaColore" text="Colore" prefWidth="140.0"/>
+                                <TableColumn fx:id="distintaLunghezza" text="Lunghezza (mm)" prefWidth="150.0"/>
+                                <TableColumn fx:id="distintaTaglio" text="Taglio" prefWidth="130.0"/>
+                                <TableColumn fx:id="distintaQuantita" text="Quantita'" prefWidth="110.0"/>
+                            </columns>
+                        </TableView>
+                    </content>
+                </Tab>
+                <Tab text="Preventivo">
+                    <content>
+                        <TableView fx:id="tabellaPreventivo">
+                            <columns>
+                                <TableColumn fx:id="prevProfilo" text="Profilo" prefWidth="160.0"/>
+                                <TableColumn fx:id="prevColore" text="Colore" prefWidth="140.0"/>
+                                <TableColumn fx:id="prevLunghezza" text="Profili (mm)" prefWidth="150.0"/>
+                                <TableColumn fx:id="prevPeso" text="Peso (kg)" prefWidth="120.0"/>
+                                <TableColumn fx:id="prevCosto" text="Costo" prefWidth="130.0"/>
+                            </columns>
+                        </TableView>
+                    </content>
+                </Tab>
+                <Tab fx:id="schedaVetri" text="Vetri">
+                    <content>
+                        <TableView fx:id="tabellaVetri">
+                            <columns>
+                                <TableColumn fx:id="vetroAltezza" text="Altezza H (mm)" prefWidth="170.0"/>
+                                <TableColumn fx:id="vetroLarghezza" text="Larghezza L (mm)" prefWidth="170.0"/>
+                                <TableColumn fx:id="vetroQuantita" text="Quantita'" prefWidth="110.0"/>
+                                <TableColumn fx:id="vetroArea" text="Area (mq)" prefWidth="130.0"/>
+                                <TableColumn fx:id="vetroCosto" text="Costo" prefWidth="130.0"/>
+                            </columns>
+                        </TableView>
+                    </content>
+                </Tab>
+            </tabs>
+        </TabPane>
+    </center>
+    <bottom>
+        <VBox spacing="4.0">
+            <padding>
+                <Insets top="10.0" right="12.0" bottom="12.0" left="12.0"/>
+            </padding>
+            <children>
+                <Label fx:id="riepilogo" text=""/>
+                <Label fx:id="prezzoTotale" text="" style="-fx-font-weight: bold; -fx-font-size: 14;"/>
+            </children>
+        </VBox>
+    </bottom>
+</BorderPane>

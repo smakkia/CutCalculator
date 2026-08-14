@@ -16,6 +16,7 @@ import com.cutcalculator.ottimizzatore.Ottimizzatore;
 import com.cutcalculator.ottimizzatore.PianoDiTaglio;
 import com.cutcalculator.preventivo.GeneratorePreventivo;
 import com.cutcalculator.preventivo.Preventivo;
+import com.cutcalculator.preventivo.RigaProfilo;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -47,51 +48,114 @@ public final class PianificatoreOrdini {
     private final Ottimizzatore ottimizzatore = new BestFitDecreasing();
     private final GeneratorePreventivo generatorePreventivo = new GeneratorePreventivo();
 
-    /** Come {@link #pianifica(List, List, double, double, Prezzi)} con i valori di default e nessun listino. */
+    /** Come {@link #pianifica(List, List, double, double)} con soglia e barra standard di default. */
     public EvasioneOrdini pianifica(List<Ordine> ordini, List<Avanzo> magazzino) {
-        return pianifica(ordini, magazzino, Prezzi.NESSUNO);
-    }
-
-    /** Come sopra ma valorizzando il preventivo col listino dato. */
-    public EvasioneOrdini pianifica(List<Ordine> ordini, List<Avanzo> magazzino, Prezzi prezzi) {
         return pianifica(ordini, magazzino, SOGLIA_RITAGLIO_DEFAULT,
-                Ottimizzatore.BARRA_STANDARD_DEFAULT, prezzi);
-    }
-
-    /** Come sopra, senza listino: il preventivo esce di sole quantità. */
-    public EvasioneOrdini pianifica(List<Ordine> ordini, List<Avanzo> magazzino,
-            double soglia, double barraStandard) {
-        return pianifica(ordini, magazzino, soglia, barraStandard, Prezzi.NESSUNO);
+                Ottimizzatore.BARRA_STANDARD_DEFAULT);
     }
 
     /**
+     * I prezzi non sono un parametro: ogni pezzo e ogni lastra si portano dietro il listino del
+     * serramento da cui vengono, quindi il preventivo si valorizza da sé.
+     *
      * @param ordini        gli ordini da evadere insieme (uniti in un unico piano)
      * @param magazzino     gli avanzi condivisi disponibili (non viene modificato)
      * @param soglia        lunghezza minima perché un ritaglio rientri come nuovo avanzo
      * @param barraStandard lunghezza della barra nuova
-     * @param prezzi        il listino con cui valorizzare il preventivo totale
      * @throws IllegalArgumentException se un pezzo è più lungo della barra standard
      */
     public EvasioneOrdini pianifica(List<Ordine> ordini, List<Avanzo> magazzino,
-            double soglia, double barraStandard, Prezzi prezzi) {
+            double soglia, double barraStandard) {
 
         // 1. Tutti i pezzi (e tutte le lastre) di tutti gli ordini in un'unica distinta.
+        //    Le singole distinte restano da parte: servono a ripartire il preventivo per ordine.
         List<Pezzo> tutti = new ArrayList<>();
         List<Vetro> tuttiVetri = new ArrayList<>();
+        List<Distinta> perOrdine = new ArrayList<>();
         for (Ordine ordine : ordini) {
             Distinta distinta = generatoreDistinta.genera(ordine);
+            perOrdine.add(distinta);
             tutti.addAll(distinta.pezzi());
             tuttiVetri.addAll(distinta.vetri());
         }
 
         // 2. Un solo piano di taglio per l'insieme (riusa gli avanzi condivisi, poi barre nuove).
-        //    Il vetro non passa di qui: si aggrega direttamente nel preventivo.
-        PianoDiTaglio piano = ottimizzatore.ottimizza(new Distinta(tutti), magazzino, barraStandard);
+        //    Il vetro non passa di qui: l'ottimizzatore guarda solo i pezzi, le lastre proseguono
+        //    verso il preventivo. La distinta unita resta comunque il documento d'officina.
+        Distinta unita = new Distinta(tutti, tuttiVetri);
+        PianoDiTaglio piano = ottimizzatore.ottimizza(unita, magazzino, barraStandard);
 
         // 3. Preventivo aggregato + magazzino aggiornato (avanzi consumati + ritagli sopra soglia).
-        Preventivo preventivo = generatorePreventivo.genera(piano, tuttiVetri, soglia, prezzi);
+        Preventivo preventivo = generatorePreventivo.genera(piano, tuttiVetri, soglia);
         List<Avanzo> aggiornato = aggiornaMagazzino(magazzino, piano, soglia);
-        return new EvasioneOrdini(ordini, piano, preventivo, aggiornato);
+        List<QuotaOrdine> quote = ripartisci(ordini, perOrdine, preventivo);
+        List<DistintaOrdine> distinte = new ArrayList<>();
+        for (int i = 0; i < ordini.size(); i++) {
+            distinte.add(new DistintaOrdine(ordini.get(i).nome(), perOrdine.get(i)));
+        }
+        return new EvasioneOrdini(ordini, distinte, piano, preventivo, aggiornato, quote);
+    }
+
+    /**
+     * Divide il preventivo globale tra gli ordini. Il criterio (e il perché) sta in
+     * {@link QuotaOrdine}: per ogni materiale si spartiscono peso e costo in proporzione ai
+     * millimetri di pezzi chiesti da ciascun ordine; il vetro invece è esatto, non si condivide.
+     */
+    private static List<QuotaOrdine> ripartisci(List<Ordine> ordini, List<Distinta> distinte,
+            Preventivo preventivo) {
+
+        // Millimetri complessivi per materiale: è il denominatore del riparto.
+        Map<Materiale, Double> lunghezzaTotale = new LinkedHashMap<>();
+        for (Distinta distinta : distinte) {
+            lunghezzePerMateriale(distinta).forEach((materiale, mm) ->
+                    lunghezzaTotale.merge(materiale, mm, Double::sum));
+        }
+        // Peso e costo che il preventivo globale attribuisce a ogni materiale.
+        Map<Materiale, RigaProfilo> righe = new LinkedHashMap<>();
+        for (RigaProfilo riga : preventivo.righe()) {
+            righe.put(new Materiale(riga.profilo(), riga.colore()), riga);
+        }
+
+        List<QuotaOrdine> quote = new ArrayList<>();
+        for (int i = 0; i < ordini.size(); i++) {
+            Distinta distinta = distinte.get(i);
+            String nome = ordini.get(i).nome();
+            if (distinta.pezzi().isEmpty() && distinta.vetri().isEmpty()) {
+                quote.add(QuotaOrdine.vuota(nome));
+                continue;
+            }
+            double lunghezza = 0;
+            double peso = 0;
+            double costo = 0;
+            List<QuotaOrdine.Riga> dettaglio = new ArrayList<>();
+            for (Map.Entry<Materiale, Double> voce : lunghezzePerMateriale(distinta).entrySet()) {
+                Materiale materiale = voce.getKey();
+                RigaProfilo riga = righe.get(materiale);
+                double totale = lunghezzaTotale.getOrDefault(materiale, 0.0);
+                double quota = riga == null || totale <= 0 ? 0 : voce.getValue() / totale;
+                double pesoRiga = riga == null ? 0 : riga.peso() * quota;
+                double costoRiga = riga == null ? 0 : riga.costo() * quota;
+                lunghezza += voce.getValue();
+                peso += pesoRiga;
+                costo += costoRiga;
+                dettaglio.add(new QuotaOrdine.Riga(materiale.profilo(), materiale.colore(),
+                        voce.getValue(), pesoRiga, costoRiga));
+            }
+            // Il vetro non si divide: le lastre sono dell'ordine, col prezzo del loro serramento.
+            double costoVetro = distinta.vetri().stream().mapToDouble(Vetro::costo).sum();
+            quote.add(new QuotaOrdine(nome, lunghezza, peso, costo,
+                    distinta.totaleLastre(), distinta.areaVetroTotaleMq(), costoVetro, dettaglio));
+        }
+        return quote;
+    }
+
+    /** Millimetri di pezzi per materiale in una distinta. */
+    private static Map<Materiale, Double> lunghezzePerMateriale(Distinta distinta) {
+        Map<Materiale, Double> lunghezze = new LinkedHashMap<>();
+        for (Pezzo pezzo : distinta.pezzi()) {
+            lunghezze.merge(pezzo.materiale(), pezzo.lunghezza(), Double::sum);
+        }
+        return lunghezze;
     }
 
     /** Magazzino post-evasione: avanzi non usati + ritagli ≥ soglia, uniti per materiale+lunghezza. */

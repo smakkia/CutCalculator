@@ -5,7 +5,9 @@ import com.cutcalculator.app.Etichette;
 import com.cutcalculator.app.Unita;
 import com.cutcalculator.catalogo.Sistema;
 import com.cutcalculator.dominio.Ordine;
+import com.cutcalculator.dominio.Prezzi;
 import com.cutcalculator.dominio.Serramento;
+import com.cutcalculator.persistenza.CalcoloOrdine;
 import com.cutcalculator.pianificazione.EvasioneOrdini;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
@@ -202,7 +204,7 @@ public final class SchermataOrdini {
     private void rinominaOrdine() {
         scelto().ifPresent(ordine -> chiediNome("Rinomina ordine", ordine.nome())
                 .ifPresent(nome -> {
-                    ordine.rinomina(nome);
+                    controller.rinominaOrdine(ordine, nome);
                     rinfrescaElenchi();
                 }));
     }
@@ -244,15 +246,28 @@ public final class SchermataOrdini {
 
     @FXML
     private void aggiungiSerramento() {
-        scelto().ifPresent(ordine -> DialogoSerramento.chiedi(controller.catalogo(), unita())
+        scelto().ifPresent(ordine -> DialogoSerramento
+                .chiedi(controller.catalogo(), unita(), prezziProposti(ordine))
                 .ifPresent(serramento -> {
-                    ordine.aggiungi(serramento);
+                    controller.aggiungiSerramento(ordine, serramento);
                     // Toccare i serramenti rimette l'ordine tra quelli da calcolare: puo' quindi
                     // aver cambiato elenco, e va ricostruita la divisione.
                     aggiorna();
                     seleziona(ordine);
                     mostraSerramentiDi(ordine);
                 }));
+    }
+
+    /**
+     * I prezzi da precompilare nel dialogo: quelli dell'<b>ultimo serramento</b> dell'ordine, che
+     * di solito è dello stesso colore e quindi allo stesso prezzo. Sul primo serramento i campi
+     * restano vuoti: meglio farli digitare che proporre un numero preso da chissà dove.
+     */
+    private static Prezzi prezziProposti(Ordine ordine) {
+        List<Serramento> serramenti = ordine.serramenti();
+        return serramenti.isEmpty()
+                ? Prezzi.NESSUNO
+                : serramenti.get(serramenti.size() - 1).prezzi();
     }
 
     @FXML
@@ -265,10 +280,28 @@ public final class SchermataOrdini {
         scelto().ifPresent(ordine -> {
             // Come in magazzino: si cerca l'oggetto, non l'indice di riga (l'ordinamento
             // per colonna scollerebbe i due indici).
-            ordine.rimuovi(ordine.serramenti().indexOf(selezionato));
+            controller.rimuoviSerramento(ordine, ordine.serramenti().indexOf(selezionato));
             aggiorna();            // l'ordine torna tra quelli da calcolare
             seleziona(ordine);
             mostraSerramentiDi(ordine);
+        });
+    }
+
+    /**
+     * I documenti dell'ultimo calcolo dell'ordine scelto — distinta, preventivo, vetri e prezzo —
+     * riletti da disco: si vedono anche quelli di sessioni precedenti, senza ricalcolare nulla.
+     */
+    @FXML
+    private void vediCalcolo() {
+        scelto().ifPresent(ordine -> {
+            CalcoloOrdine calcolo = controller.calcoloDi(ordine);
+            if (calcolo.vuoto()) {
+                Dialoghi.informa("Nessun calcolo", ordine.calcolato()
+                        ? "Di quest'ordine non ci sono documenti salvati."
+                        : "Ordine non ancora calcolato: usa \"Calcola gli ordini da calcolare\".");
+                return;
+            }
+            DialogoCalcolo.mostra(calcolo, ordine.nome(), ordine.calcolato(), unita());
         });
     }
 
