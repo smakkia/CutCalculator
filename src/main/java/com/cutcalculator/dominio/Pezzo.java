@@ -21,4 +21,14 @@ public record Pezzo(Profilo profilo, Colore colore, double lunghezza,
     public Materiale materiale() {
         return new Materiale(profilo, colore);
     }
+
+    /** Peso del pezzo (kg): lunghezza × peso lineare del profilo. */
+    public double peso() {
+        return profilo.peso(lunghezza);
+    }
+
+    /** Costo del materiale di questo pezzo (€): peso × prezzo al chilo del profilo. */
+    public double prezzo() {
+        return profilo.prezzo(lunghezza);
+    }
 }

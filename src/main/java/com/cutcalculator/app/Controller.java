@@ -3,6 +3,7 @@ package com.cutcalculator.app;
 import com.cutcalculator.catalogo.Catalogo;
 import com.cutcalculator.dominio.Avanzo;
 import com.cutcalculator.dominio.Ordine;
+import com.cutcalculator.dominio.Prezzi;
 import com.cutcalculator.formule.Distinta;
 import com.cutcalculator.formule.GeneratoreDistinta;
 import com.cutcalculator.ottimizzatore.BestFitDecreasing;
@@ -37,6 +38,7 @@ public final class Controller {
     private final List<Avanzo> magazzino = new ArrayList<>();
     private final List<Ordine> ordini = new ArrayList<>();
     private Unita unita = Unita.PREDEFINITA;
+    private Prezzi prezzi = Prezzi.NESSUNO;
 
     /** Solo in memoria, senza persistenza: comodo per test o usi effimeri. */
     public Controller(Catalogo catalogo) {
@@ -71,6 +73,7 @@ public final class Controller {
         }
         if (archivioImpostazioni != null) {
             unita = archivioImpostazioni.caricaUnita();
+            prezzi = archivioImpostazioni.caricaPrezzi();
         }
     }
 
@@ -89,6 +92,23 @@ public final class Controller {
         this.unita = unita;
         if (archivioImpostazioni != null) {
             archivioImpostazioni.salvaUnita(unita);
+        }
+    }
+
+    /**
+     * Il listino con cui valorizzare il preventivo (€/kg dell'alluminio, €/mq del vetro). È un dato
+     * dell'utente, non del catalogo: finché non lo imposta vale {@link Prezzi#NESSUNO} e i costi
+     * vengono zero.
+     */
+    public Prezzi prezzi() {
+        return prezzi;
+    }
+
+    /** Cambia il listino e lo persiste, se c'è un archivio impostazioni collegato. */
+    public void impostaPrezzi(Prezzi prezzi) {
+        this.prezzi = prezzi;
+        if (archivioImpostazioni != null) {
+            archivioImpostazioni.salvaPrezzi(prezzi);
         }
     }
 
@@ -111,6 +131,19 @@ public final class Controller {
     /** Vista in sola lettura degli ordini (l'ordine è quello di inserimento). */
     public List<Ordine> ordini() {
         return List.copyOf(ordini);
+    }
+
+    /**
+     * Gli ordini <b>da calcolare</b>: quelli che il prossimo calcolo globale prenderà in carico.
+     * Un ordine ci resta finché non viene evaso, e ci <b>ritorna</b> se lo si modifica.
+     */
+    public List<Ordine> ordiniDaCalcolare() {
+        return ordini.stream().filter(ordine -> !ordine.calcolato()).toList();
+    }
+
+    /** Gli ordini <b>già calcolati</b>: il loro materiale è stato scalato dal magazzino. */
+    public List<Ordine> ordiniCalcolati() {
+        return ordini.stream().filter(Ordine::calcolato).toList();
     }
 
     // --- Operazioni sul magazzino ------------------------------------------------------
@@ -209,14 +242,20 @@ public final class Controller {
 
     /**
      * Fa scorrere l'ordine lungo le tre fasi (distinta → piano → preventivo) riusando gli
-     * avanzi correnti del magazzino, e restituisce i tre risultati insieme.
+     * avanzi correnti del magazzino <b>senza consumarli</b>, e restituisce i tre risultati insieme.
+     * <p>
+     * <b>Non è più esposto dalle UI</b> (2026-08-14): il "calcolo provvisorio" del singolo ordine
+     * confondeva, perché mostrava un piano che il calcolo globale poi rifaceva diverso — lì gli
+     * ordini si uniscono e condividono le barre. Resta qui solo perché lo usano i test: quando li
+     * rivedremo, questo metodo e il record {@link Risultato} se ne vanno insieme a loro.
      *
      * @throws IllegalArgumentException se un pezzo è più lungo della barra standard
      */
     public Risultato calcola(Ordine ordine) {
         Distinta distinta = new GeneratoreDistinta().genera(ordine);
         PianoDiTaglio piano = new BestFitDecreasing().ottimizza(distinta, magazzino);
-        Preventivo preventivo = new GeneratorePreventivo().genera(piano, sogliaRitaglio());
+        Preventivo preventivo = new GeneratorePreventivo()
+                .genera(piano, distinta.vetri(), sogliaRitaglio(), prezzi);
         return new Risultato(distinta, piano, preventivo);
     }
 
@@ -226,22 +265,27 @@ public final class Controller {
     }
 
     /**
-     * Calcolo <b>globale</b>: pianifica <b>tutti</b> gli ordini insieme sul magazzino condiviso
-     * (ogni avanzo va a un solo ordine, vedi {@link PianificatoreOrdini}) e poi <b>applica</b> il
-     * risultato — sostituisce il magazzino con quello aggiornato (avanzi usati consumati, ritagli
-     * sopra soglia rientrati) e lo persiste. A differenza di {@link #calcola}, questo <b>consuma</b>.
+     * Calcolo <b>globale</b>: pianifica insieme gli ordini <b>da calcolare</b> (non quelli già
+     * evasi) sul magazzino condiviso, così i loro pezzi condividono le barre, e poi <b>applica</b>
+     * il risultato — sostituisce il magazzino con quello aggiornato (avanzi usati consumati, ritagli
+     * sopra soglia rientrati), lo persiste e segna gli ordini come calcolati.
+     * <p>
+     * Gli ordini già calcolati restano fuori: il loro materiale è stato scalato una volta e
+     * ripassarci sopra lo conterebbe due volte.
      *
      * @throws IllegalArgumentException se un pezzo è più lungo della barra standard
      */
     public EvasioneOrdini evadiOrdini() {
-        EvasioneOrdini evasione = new PianificatoreOrdini().pianifica(ordini, magazzino);
+        List<Ordine> daCalcolare = ordiniDaCalcolare();
+        EvasioneOrdini evasione = new PianificatoreOrdini().pianifica(daCalcolare, magazzino, prezzi);
         magazzino.clear();
         magazzino.addAll(evasione.magazzinoAggiornato());
         salva();
+        daCalcolare.forEach(Ordine::segnaCalcolato);
         return evasione;
     }
 
-    /** I tre output della pipeline per un ordine. */
+    /** I tre output della pipeline per un ordine. Vedi {@link #calcola}: non più usato dalle UI. */
     public record Risultato(Distinta distinta, PianoDiTaglio piano, Preventivo preventivo) {
     }
 }

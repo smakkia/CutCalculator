@@ -33,6 +33,27 @@ final class Campi {
         }
     }
 
+    /** Il messaggio d'errore per un prezzo non valido: uno solo, condiviso da chi legge i prezzi. */
+    static final String PREZZO_NON_VALIDO =
+            "Inserisci un prezzo non negativo (es. 6,50), oppure 0 / vuoto per \"non impostato\".";
+
+    /**
+     * Il prezzo scritto nel campo, in euro. Come le misure accetta virgola o punto, ma a differenza
+     * loro ammette lo <b>zero</b> (prezzo non impostato) e il campo <b>vuoto</b>, che vale zero.
+     */
+    static OptionalDouble prezzo(TextField campo) {
+        String testo = campo.getText() == null ? "" : campo.getText().trim().replace(',', '.');
+        if (testo.isBlank()) {
+            return OptionalDouble.of(0);
+        }
+        try {
+            double valore = Double.parseDouble(testo);
+            return valore >= 0 ? OptionalDouble.of(valore) : OptionalDouble.empty();
+        } catch (NumberFormatException nonValido) {
+            return OptionalDouble.empty();
+        }
+    }
+
     /** Il messaggio d'errore per una misura non valida, con l'unità e un esempio coerenti. */
     static String misuraNonValida(Unita unita) {
         return "Inserisci una misura positiva in " + unita.simbolo()

@@ -11,6 +11,7 @@ import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
@@ -20,18 +21,25 @@ import javafx.scene.control.TextInputDialog;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Il tab <b>Ordini</b>: a sinistra le commesse, a destra i serramenti di quella scelta.
  * <p>
- * Due calcoli, con effetti diversi: <b>Calcola questo ordine</b> è un'<i>anteprima</i> — riusa gli
- * avanzi correnti senza consumarli — mentre <b>Calcola tutti gli ordini</b> unisce tutte le
- * commesse in un piano unico (i pezzi di ordini diversi condividono le barre) e <b>scarica il
- * magazzino</b>, per cui chiede conferma. I risultati finiscono nel tab Risultati.
+ * Le commesse stanno in <b>due elenchi</b>: quelle <i>da calcolare</i> e quelle <i>calcolate</i>,
+ * cioè già evase da un calcolo globale che ne ha scalato il materiale. La selezione è una sola:
+ * scegliendo in un elenco l'altro si deseleziona, così "il serramento di quale ordine" non è mai
+ * ambiguo.
+ * <p>
+ * Un solo calcolo: <b>Calcola gli ordini da calcolare</b> unisce le commesse non ancora evase in un
+ * piano unico (i pezzi di ordini diversi condividono le barre), <b>scarica il magazzino</b> — per
+ * cui chiede conferma — e le sposta tra i calcolati. Il risultato finisce nel tab Risultati.
  */
 public final class SchermataOrdini {
 
-    @FXML private ListView<Ordine> elencoOrdini;
+    @FXML private ListView<Ordine> elencoDaCalcolare;
+    @FXML private ListView<Ordine> elencoCalcolati;
+    @FXML private Button bottoneCalcola;
     @FXML private Label riepilogo;
     @FXML private TableView<Serramento> tabellaSerramenti;
     @FXML private TableColumn<Serramento, String> colonnaSistema;
@@ -42,25 +50,16 @@ public final class SchermataOrdini {
     @FXML private TableColumn<Serramento, String> colonnaHF;
     @FXML private TableColumn<Serramento, String> colonnaQuantita;
 
-    private final ObservableList<Ordine> ordini = FXCollections.observableArrayList();
+    private final ObservableList<Ordine> daCalcolare = FXCollections.observableArrayList();
+    private final ObservableList<Ordine> calcolati = FXCollections.observableArrayList();
     private final ObservableList<Serramento> serramenti = FXCollections.observableArrayList();
     private Controller controller;
     private SchermataPrincipale principale;
 
     @FXML
     private void initialize() {
-        elencoOrdini.setItems(ordini);
-        elencoOrdini.setPlaceholder(new Label("Nessun ordine: creane uno."));
-        elencoOrdini.setCellFactory(lista -> new ListCell<>() {
-            @Override
-            protected void updateItem(Ordine ordine, boolean vuota) {
-                super.updateItem(ordine, vuota);
-                setText(vuota || ordine == null ? null
-                        : ordine.nome() + "  (" + ordine.totaleSerramenti() + " serramenti)");
-            }
-        });
-        elencoOrdini.getSelectionModel().selectedItemProperty()
-                .addListener((osservabile, prima, adesso) -> mostraSerramentiDi(adesso));
+        preparaElenco(elencoDaCalcolare, daCalcolare, "Niente da calcolare.", elencoCalcolati);
+        preparaElenco(elencoCalcolati, calcolati, "Nessun ordine calcolato.", elencoDaCalcolare);
 
         colonnaSistema.setCellValueFactory(riga -> new ReadOnlyStringWrapper(
                 controller.catalogo().sistemaDi(riga.getValue().tipologia())
@@ -88,6 +87,31 @@ public final class SchermataOrdini {
         tabellaSerramenti.setPlaceholder(new Label("Ordine vuoto: aggiungi un serramento."));
     }
 
+    /**
+     * Uno dei due elenchi: stessa resa delle celle e selezione <b>mutuamente esclusiva</b> con
+     * l'altro, così l'ordine scelto è sempre uno solo.
+     */
+    private void preparaElenco(ListView<Ordine> elenco, ObservableList<Ordine> contenuto,
+            String seVuoto, ListView<Ordine> gemello) {
+        elenco.setItems(contenuto);
+        elenco.setPlaceholder(new Label(seVuoto));
+        elenco.setCellFactory(lista -> new ListCell<>() {
+            @Override
+            protected void updateItem(Ordine ordine, boolean vuota) {
+                super.updateItem(ordine, vuota);
+                setText(vuota || ordine == null ? null
+                        : ordine.nome() + "  (" + ordine.totaleSerramenti() + " serramenti)");
+            }
+        });
+        elenco.getSelectionModel().selectedItemProperty()
+                .addListener((osservabile, prima, adesso) -> {
+                    if (adesso != null) {
+                        gemello.getSelectionModel().clearSelection();
+                        mostraSerramentiDi(adesso);
+                    }
+                });
+    }
+
     public void inizializza(Controller controller, SchermataPrincipale principale) {
         this.controller = controller;
         this.principale = principale;
@@ -110,38 +134,56 @@ public final class SchermataOrdini {
 
     /** Rilegge gli ordini dal controller mantenendo, se possibile, quello selezionato. */
     public void aggiorna() {
-        Ordine selezionato = elencoOrdini.getSelectionModel().getSelectedItem();
-        ordini.setAll(controller.ordini());
-        if (selezionato != null && ordini.contains(selezionato)) {
-            elencoOrdini.getSelectionModel().select(selezionato);
+        Ordine selezionato = selezionato();
+        daCalcolare.setAll(controller.ordiniDaCalcolare());
+        calcolati.setAll(controller.ordiniCalcolati());
+        if (selezionato != null) {
+            seleziona(selezionato);
         } else {
-            elencoOrdini.getSelectionModel().selectFirst();
+            elencoDaCalcolare.getSelectionModel().selectFirst();
         }
-        mostraSerramentiDi(elencoOrdini.getSelectionModel().getSelectedItem());
-        riepilogo.setText(ordini.isEmpty()
+        mostraSerramentiDi(selezionato());
+        int totale = daCalcolare.size() + calcolati.size();
+        riepilogo.setText(totale == 0
                 ? "Nessun ordine."
-                : ordini.size() + " ordini in memoria.");
+                : totale + " ordini: " + daCalcolare.size() + " da calcolare, "
+                        + calcolati.size() + " calcolati.");
+        bottoneCalcola.setDisable(daCalcolare.isEmpty());
     }
 
-    /** Porta in primo piano l'ordine dato. */
+    /** Porta in primo piano l'ordine dato, nell'elenco in cui si trova adesso. */
     public void seleziona(Ordine ordine) {
-        if (!ordini.contains(ordine)) {
+        ListView<Ordine> elenco = ordine.calcolato() ? elencoCalcolati : elencoDaCalcolare;
+        if (!elenco.getItems().contains(ordine)) {
             aggiorna();
+            return;
         }
-        elencoOrdini.getSelectionModel().select(ordine);
+        elenco.getSelectionModel().select(ordine);
     }
 
     private void mostraSerramentiDi(Ordine ordine) {
         serramenti.setAll(ordine == null ? List.of() : ordine.serramenti());
     }
 
+    /** L'ordine selezionato in uno dei due elenchi, o {@code null} se non ce n'è nessuno. */
+    private Ordine selezionato() {
+        Ordine daFare = elencoDaCalcolare.getSelectionModel().getSelectedItem();
+        return daFare != null ? daFare : elencoCalcolati.getSelectionModel().getSelectedItem();
+    }
+
     /** L'ordine su cui agire, o vuoto (con messaggio) se non ce n'è uno selezionato. */
     private Optional<Ordine> scelto() {
-        Ordine ordine = elencoOrdini.getSelectionModel().getSelectedItem();
+        Ordine ordine = selezionato();
         if (ordine == null) {
-            Dialoghi.errore("Nessun ordine scelto", "Seleziona un ordine dall'elenco.");
+            Dialoghi.errore("Nessun ordine scelto", "Seleziona un ordine da uno dei due elenchi.");
         }
         return Optional.ofNullable(ordine);
+    }
+
+    /** Rinfresca le celle dei due elenchi (nomi e conteggi dei serramenti). */
+    private void rinfrescaElenchi() {
+        elencoDaCalcolare.refresh();
+        elencoCalcolati.refresh();
     }
 
     // --- Azioni sugli ordini -----------------------------------------------------------
@@ -152,7 +194,7 @@ public final class SchermataOrdini {
                 .ifPresent(nome -> {
                     Ordine ordine = controller.nuovoOrdine(nome);
                     aggiorna();
-                    elencoOrdini.getSelectionModel().select(ordine);
+                    seleziona(ordine);
                 });
     }
 
@@ -161,7 +203,7 @@ public final class SchermataOrdini {
         scelto().ifPresent(ordine -> chiediNome("Rinomina ordine", ordine.nome())
                 .ifPresent(nome -> {
                     ordine.rinomina(nome);
-                    elencoOrdini.refresh();
+                    rinfrescaElenchi();
                 }));
     }
 
@@ -205,8 +247,11 @@ public final class SchermataOrdini {
         scelto().ifPresent(ordine -> DialogoSerramento.chiedi(controller.catalogo(), unita())
                 .ifPresent(serramento -> {
                     ordine.aggiungi(serramento);
+                    // Toccare i serramenti rimette l'ordine tra quelli da calcolare: puo' quindi
+                    // aver cambiato elenco, e va ricostruita la divisione.
+                    aggiorna();
+                    seleziona(ordine);
                     mostraSerramentiDi(ordine);
-                    elencoOrdini.refresh();
                 }));
     }
 
@@ -221,46 +266,42 @@ public final class SchermataOrdini {
             // Come in magazzino: si cerca l'oggetto, non l'indice di riga (l'ordinamento
             // per colonna scollerebbe i due indici).
             ordine.rimuovi(ordine.serramenti().indexOf(selezionato));
+            aggiorna();            // l'ordine torna tra quelli da calcolare
+            seleziona(ordine);
             mostraSerramentiDi(ordine);
-            elencoOrdini.refresh();
         });
     }
 
-    // --- Calcoli -----------------------------------------------------------------------
-
-    @FXML
-    private void calcolaOrdine() {
-        scelto().ifPresent(ordine -> {
-            if (ordine.serramenti().isEmpty()) {
-                Dialoghi.errore("Ordine vuoto", "Aggiungi almeno un serramento.");
-                return;
-            }
-            try {
-                principale.mostraRisultato(controller.calcola(ordine),
-                        "Anteprima dell'ordine \"" + ordine.nome() + "\""
-                                + " (gli avanzi non vengono consumati)");
-            } catch (IllegalArgumentException nonCalcolabile) {
-                Dialoghi.errore("Calcolo non riuscito", nonCalcolabile);
-            }
-        });
-    }
+    // --- Calcolo -----------------------------------------------------------------------
+    // Il "calcolo provvisorio" del singolo ordine e' stato tolto: mostrava un piano che il calcolo
+    // globale poi rifaceva diverso, perche' li' gli ordini si uniscono e condividono le barre.
 
     @FXML
     private void calcolaTutti() {
-        if (controller.ordini().isEmpty()) {
-            Dialoghi.errore("Nessun ordine", "Crea almeno un ordine.");
+        List<Ordine> daFare = controller.ordiniDaCalcolare();
+        if (daFare.isEmpty()) {
+            Dialoghi.errore("Niente da calcolare", controller.ordini().isEmpty()
+                    ? "Crea almeno un ordine."
+                    : "Gli ordini sono gia' stati calcolati tutti.");
             return;
         }
-        boolean conferma = Dialoghi.conferma("Calcola tutti gli ordini",
-                "Tutti gli ordini vengono uniti in un piano di taglio unico e il magazzino viene "
-                        + "aggiornato: gli avanzi usati sono consumati e i ritagli sopra "
+        if (daFare.stream().allMatch(ordine -> ordine.serramenti().isEmpty())) {
+            Dialoghi.errore("Ordini vuoti", "Aggiungi almeno un serramento agli ordini da calcolare.");
+            return;
+        }
+        String elenco = daFare.stream().map(Ordine::nome).collect(Collectors.joining(", "));
+        boolean conferma = Dialoghi.conferma("Calcola gli ordini da calcolare",
+                "Vengono calcolati insieme, in un piano di taglio unico: " + elenco + ".\n\n"
+                        + "Il magazzino viene aggiornato (gli avanzi usati sono consumati e i "
+                        + "ritagli sopra "
                         + Etichette.misuraConSimbolo(controller.sogliaRitaglio(), unita())
-                        + " rientrano. Procedo?");
+                        + " rientrano) e gli ordini passano tra i calcolati. Procedo?");
         if (!conferma) {
             return;
         }
         try {
             EvasioneOrdini evasione = controller.evadiOrdini();
+            aggiorna();
             principale.mostraEvasione(evasione);
         } catch (IllegalArgumentException nonCalcolabile) {
             Dialoghi.errore("Calcolo non riuscito", nonCalcolabile);

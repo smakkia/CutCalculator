@@ -1,20 +1,40 @@
 package com.cutcalculator.preventivo;
 
 import com.cutcalculator.dominio.Colore;
+import com.cutcalculator.dominio.Prezzi;
 import com.cutcalculator.dominio.Profilo;
 
 import java.util.List;
 import java.util.Optional;
 
 /**
- * L'output della Fase 3: la stima del materiale necessario per un ordine, una
- * {@link RigaProfilo riga} per profilo. È di sola quantità (nessun prezzo: il profilo non
- * ne ha). Vetro e accessori entreranno qui quando saranno nel modello.
+ * L'output della Fase 3: la stima del materiale necessario per un ordine — una
+ * {@link RigaProfilo riga} per profilo (barre da comprare, avanzi riusati, sfrido) e una
+ * {@link RigaVetro riga} per misura di lastra. Gli accessori entreranno qui quando saranno nel modello.
+ * <p>
+ * Le due parti si contano in unità diverse e restano quindi separate: le barre in <b>metri lineari</b>
+ * (e passano dall'ottimizzatore), il vetro in <b>metri quadri</b> (e no). Anche il <b>costo</b> segue
+ * quella divisione: l'alluminio si paga a peso (€/kg), il vetro a superficie (€/mq).
+ * <p>
+ * Il {@link Prezzi listino} usato viaggia <b>dentro</b> il preventivo: i costi non sono memorizzati
+ * ma ricalcolati dalle quantità, e restano legati ai prezzi con cui il preventivo è stato fatto —
+ * che è esattamente quello che ci si aspetta da un preventivo. Senza listino i costi sono zero.
  */
-public record Preventivo(List<RigaProfilo> righe) {
+public record Preventivo(List<RigaProfilo> righe, List<RigaVetro> righeVetro, Prezzi prezzi) {
 
     public Preventivo {
         righe = List.copyOf(righe);
+        righeVetro = List.copyOf(righeVetro);
+    }
+
+    /** Preventivo di soli profili: quando la tipologia non ha (ancora) le quote del vetro. */
+    public Preventivo(List<RigaProfilo> righe) {
+        this(righe, List.of(), Prezzi.NESSUNO);
+    }
+
+    /** Preventivo di sole quantità, senza listino: tutti i costi vengono zero. */
+    public Preventivo(List<RigaProfilo> righe, List<RigaVetro> righeVetro) {
+        this(righe, righeVetro, Prezzi.NESSUNO);
     }
 
     /** Barre nuove da comprare in totale, su tutti i profili. */
@@ -50,6 +70,38 @@ public record Preventivo(List<RigaProfilo> righe) {
     /** Lo sfrido che resta scarto vero: troppo corto per tornare a magazzino. */
     public double scartoTotale() {
         return sfridoTotale() - lunghezzaRecuperabileTotale();
+    }
+
+    /** Quante lastre di vetro in tutto, di qualunque misura. */
+    public int totaleLastre() {
+        return righeVetro.stream().mapToInt(RigaVetro::quantita).sum();
+    }
+
+    /** Superficie vetrata complessiva da ordinare, in metri quadri. */
+    public double areaVetroTotaleMq() {
+        return righeVetro.stream().mapToDouble(RigaVetro::areaTotaleMq).sum();
+    }
+
+    // --- Costi: quantità × listino dell'utente ----------------------------------------
+
+    /** Peso (kg) delle barre nuove da comprare, su tutti i profili. */
+    public double pesoTotale() {
+        return righe.stream().mapToDouble(RigaProfilo::peso).sum();
+    }
+
+    /** Quanto costano le barre nuove: il peso di ogni riga per il suo €/kg. */
+    public double costoBarre() {
+        return righe.stream().mapToDouble(riga -> riga.costo(prezzi)).sum();
+    }
+
+    /** Quanto costa il vetro: la superficie ordinata per il €/mq. */
+    public double costoVetro() {
+        return righeVetro.stream().mapToDouble(riga -> riga.costo(prezzi)).sum();
+    }
+
+    /** Il costo del materiale dell'ordine: barre nuove + vetro. */
+    public double costoTotale() {
+        return costoBarre() + costoVetro();
     }
 
     /** La riga di un dato profilo in un dato colore, se presente nel preventivo. */

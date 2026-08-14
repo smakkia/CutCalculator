@@ -22,4 +22,24 @@ public record Avanzo(Profilo profilo, Colore colore, double lunghezza, int quant
     public Materiale materiale() {
         return new Materiale(profilo, colore);
     }
+
+    /** Peso (kg) di <b>uno</b> di questi spezzoni. */
+    public double peso() {
+        return profilo.peso(lunghezza);
+    }
+
+    /** Peso (kg) di tutti gli spezzoni della riga ({@code peso × quantita}). */
+    public double pesoTotale() {
+        return peso() * quantita;
+    }
+
+    /** Valore (€) di <b>uno</b> di questi spezzoni: materiale già di proprietà, non da comprare. */
+    public double prezzo() {
+        return profilo.prezzo(lunghezza);
+    }
+
+    /** Valore (€) di tutti gli spezzoni della riga. */
+    public double prezzoTotale() {
+        return prezzo() * quantita;
+    }
 }

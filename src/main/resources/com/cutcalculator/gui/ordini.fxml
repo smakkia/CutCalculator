@@ -18,15 +18,26 @@
            dividerPositions="0.32">
     <items>
         <BorderPane>
-            <top>
-                <Label text="Ordini" style="-fx-font-weight: bold;">
-                    <padding>
-                        <Insets top="10.0" right="10.0" bottom="6.0" left="12.0"/>
-                    </padding>
-                </Label>
-            </top>
             <center>
-                <ListView fx:id="elencoOrdini"/>
+                <VBox spacing="4.0">
+                    <padding>
+                        <Insets top="10.0" right="0.0" bottom="0.0" left="0.0"/>
+                    </padding>
+                    <children>
+                        <Label text="Da calcolare" style="-fx-font-weight: bold;">
+                            <padding>
+                                <Insets top="0.0" right="10.0" bottom="4.0" left="12.0"/>
+                            </padding>
+                        </Label>
+                        <ListView fx:id="elencoDaCalcolare" VBox.vgrow="ALWAYS"/>
+                        <Label text="Calcolati" style="-fx-font-weight: bold;">
+                            <padding>
+                                <Insets top="8.0" right="10.0" bottom="4.0" left="12.0"/>
+                            </padding>
+                        </Label>
+                        <ListView fx:id="elencoCalcolati" VBox.vgrow="ALWAYS"/>
+                    </children>
+                </VBox>
             </center>
             <bottom>
                 <VBox spacing="8.0">
@@ -43,8 +54,8 @@
                             </children>
                         </HBox>
                         <Separator/>
-                        <Button text="Calcola tutti gli ordini" onAction="#calcolaTutti"
-                                maxWidth="Infinity"/>
+                        <Button fx:id="bottoneCalcola" text="Calcola gli ordini da calcolare"
+                                onAction="#calcolaTutti" maxWidth="Infinity"/>
                     </children>
                 </VBox>
             </bottom>
@@ -79,7 +90,6 @@
                     <children>
                         <Button text="Aggiungi serramento" onAction="#aggiungiSerramento"/>
                         <Button text="Rimuovi selezionato" onAction="#rimuoviSerramento"/>
-                        <Button text="Calcola questo ordine (anteprima)" onAction="#calcolaOrdine"/>
                     </children>
                 </HBox>
             </bottom>

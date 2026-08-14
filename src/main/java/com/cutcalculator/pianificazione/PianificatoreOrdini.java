@@ -5,7 +5,9 @@ import com.cutcalculator.dominio.Colore;
 import com.cutcalculator.dominio.Materiale;
 import com.cutcalculator.dominio.Ordine;
 import com.cutcalculator.dominio.Pezzo;
+import com.cutcalculator.dominio.Prezzi;
 import com.cutcalculator.dominio.Profilo;
+import com.cutcalculator.dominio.Vetro;
 import com.cutcalculator.formule.Distinta;
 import com.cutcalculator.formule.GeneratoreDistinta;
 import com.cutcalculator.ottimizzatore.BarraTagliata;
@@ -45,9 +47,21 @@ public final class PianificatoreOrdini {
     private final Ottimizzatore ottimizzatore = new BestFitDecreasing();
     private final GeneratorePreventivo generatorePreventivo = new GeneratorePreventivo();
 
-    /** Come {@link #pianifica(List, List, double, double)} con soglia e barra standard di default. */
+    /** Come {@link #pianifica(List, List, double, double, Prezzi)} con i valori di default e nessun listino. */
     public EvasioneOrdini pianifica(List<Ordine> ordini, List<Avanzo> magazzino) {
-        return pianifica(ordini, magazzino, SOGLIA_RITAGLIO_DEFAULT, Ottimizzatore.BARRA_STANDARD_DEFAULT);
+        return pianifica(ordini, magazzino, Prezzi.NESSUNO);
+    }
+
+    /** Come sopra ma valorizzando il preventivo col listino dato. */
+    public EvasioneOrdini pianifica(List<Ordine> ordini, List<Avanzo> magazzino, Prezzi prezzi) {
+        return pianifica(ordini, magazzino, SOGLIA_RITAGLIO_DEFAULT,
+                Ottimizzatore.BARRA_STANDARD_DEFAULT, prezzi);
+    }
+
+    /** Come sopra, senza listino: il preventivo esce di sole quantità. */
+    public EvasioneOrdini pianifica(List<Ordine> ordini, List<Avanzo> magazzino,
+            double soglia, double barraStandard) {
+        return pianifica(ordini, magazzino, soglia, barraStandard, Prezzi.NESSUNO);
     }
 
     /**
@@ -55,22 +69,27 @@ public final class PianificatoreOrdini {
      * @param magazzino     gli avanzi condivisi disponibili (non viene modificato)
      * @param soglia        lunghezza minima perché un ritaglio rientri come nuovo avanzo
      * @param barraStandard lunghezza della barra nuova
+     * @param prezzi        il listino con cui valorizzare il preventivo totale
      * @throws IllegalArgumentException se un pezzo è più lungo della barra standard
      */
     public EvasioneOrdini pianifica(List<Ordine> ordini, List<Avanzo> magazzino,
-            double soglia, double barraStandard) {
+            double soglia, double barraStandard, Prezzi prezzi) {
 
-        // 1. Tutti i pezzi di tutti gli ordini in un'unica distinta.
+        // 1. Tutti i pezzi (e tutte le lastre) di tutti gli ordini in un'unica distinta.
         List<Pezzo> tutti = new ArrayList<>();
+        List<Vetro> tuttiVetri = new ArrayList<>();
         for (Ordine ordine : ordini) {
-            tutti.addAll(generatoreDistinta.genera(ordine).pezzi());
+            Distinta distinta = generatoreDistinta.genera(ordine);
+            tutti.addAll(distinta.pezzi());
+            tuttiVetri.addAll(distinta.vetri());
         }
 
         // 2. Un solo piano di taglio per l'insieme (riusa gli avanzi condivisi, poi barre nuove).
+        //    Il vetro non passa di qui: si aggrega direttamente nel preventivo.
         PianoDiTaglio piano = ottimizzatore.ottimizza(new Distinta(tutti), magazzino, barraStandard);
 
         // 3. Preventivo aggregato + magazzino aggiornato (avanzi consumati + ritagli sopra soglia).
-        Preventivo preventivo = generatorePreventivo.genera(piano);
+        Preventivo preventivo = generatorePreventivo.genera(piano, tuttiVetri, soglia, prezzi);
         List<Avanzo> aggiornato = aggiornaMagazzino(magazzino, piano, soglia);
         return new EvasioneOrdini(ordini, piano, preventivo, aggiornato);
     }

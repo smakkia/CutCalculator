@@ -2,6 +2,7 @@ package com.cutcalculator.preventivo;
 
 import com.cutcalculator.dominio.Avanzo;
 import com.cutcalculator.dominio.Colore;
+import com.cutcalculator.dominio.Prezzi;
 import com.cutcalculator.dominio.Profilo;
 
 /**
@@ -29,5 +30,18 @@ public record RigaProfilo(Profilo profilo, Colore colore, int barreNuove, int av
     /** Lo sfrido che non si recupera: spezzoni troppo corti per tornare a magazzino. */
     public double scarto() {
         return sfrido - lunghezzaRecuperabile;
+    }
+
+    /**
+     * Il peso (kg) del materiale <b>da comprare</b>, cioè delle sole barre nuove: gli avanzi riusati
+     * sono già di proprietà e non si pagano. Zero finché il profilo non ha il peso lineare (kg/m).
+     */
+    public double peso() {
+        return profilo.peso(lunghezzaNuova);
+    }
+
+    /** Quanto costano le barre nuove di questa riga: {@link #peso()} × €/kg del listino. */
+    public double costo(Prezzi prezzi) {
+        return prezzi.costoBarre(profilo, peso());
     }
 }

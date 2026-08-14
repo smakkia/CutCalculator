@@ -4,6 +4,7 @@ import com.cutcalculator.dominio.Categoria;
 import com.cutcalculator.dominio.Formula;
 import com.cutcalculator.dominio.Profilo;
 import com.cutcalculator.dominio.RegolaTaglio;
+import com.cutcalculator.dominio.RegolaVetro;
 import com.cutcalculator.dominio.Tipologia;
 
 import java.util.ArrayList;
@@ -37,19 +38,23 @@ public final class CatalogoSX120 {
     }
 
     // --- Anagrafica profili (Gruppo B) -------------------------------------------------
-    private static final Profilo BINARIO_SINGOLO = new Profilo("SX11.154", "Telaio (binario singolo)", Categoria.TELAIO);
-    private static final Profilo BINARIO_2VIE = new Profilo("SX11.101", "Telaio (binario 2 vie)", Categoria.TELAIO);
-    private static final Profilo BINARIO_3VIE = new Profilo("SX11.130", "Telaio (binario 3 vie)", Categoria.TELAIO);
-    private static final Profilo BINARIO_RIBASSATO = new Profilo("SX11.176", "Telaio (binario 2 vie ribassato)", Categoria.TELAIO);
-    private static final Profilo ESTERNO = new Profilo("SX12.101", "Telaio esterno", Categoria.TELAIO);
-    private static final Profilo ESTERNO_SINGOLO = new Profilo("SX12.153", "Telaio esterno (via singola)", Categoria.TELAIO);
-    private static final Profilo CARTER = new Profilo("SX12.501", "Carter per telaio", Categoria.TELAIO);
-    private static final Profilo ANTA = new Profilo("SX12.203", "Anta (vetro infilare)", Categoria.ANTA);
-    private static final Profilo ANTA_RIDOTTA = new Profilo("SX12.204", "Anta (vetro infilare ridotta)", Categoria.ANTA);
-    private static final Profilo ANTA_ANGOLO = new Profilo("SX12.205", "Anta (vetro infilare per angolo)", Categoria.ANTA);
-    private static final Profilo INCONTRO = new Profilo("SX12.301", "Incontro centrale", Categoria.MONTANTE);
-    private static final Profilo INCONTRO_4ANTE = new Profilo("SX12.303", "Incontro (per 4 ante)", Categoria.MONTANTE);
-    private static final Profilo INCONTRO_ANGOLO = new Profilo("SX12.305", "Incontro angolo (assieme .304/.305/.306)", Categoria.MONTANTE);
+    // 4° argomento = peso in kg/m, dalla voce "Peso kg/ml." delle schede.
+    private static final Profilo BINARIO_SINGOLO = new Profilo("SX11.154", "Telaio (binario singolo)", Categoria.TELAIO, 1.226);
+    // Condivisi con SX 110: un solo posto dove scriverne il peso (vedi ProfiliCondivisi).
+    private static final Profilo BINARIO_2VIE = ProfiliCondivisi.BINARIO_2VIE;
+    private static final Profilo BINARIO_3VIE = ProfiliCondivisi.BINARIO_3VIE;
+    // La scheda SX 110 dà 1.565 per questo codice ("Soglia ribassata"): qui vale il dato del
+    // catalogo in cui il profilo è usato, cioè SX 120 ("Telaio binario 2 vie ribassato").
+    private static final Profilo BINARIO_RIBASSATO = new Profilo("SX11.176", "Telaio (binario 2 vie ribassato)", Categoria.TELAIO, 1.501);
+    private static final Profilo ESTERNO = new Profilo("SX12.101", "Telaio esterno", Categoria.TELAIO, 0.912);
+    private static final Profilo ESTERNO_SINGOLO = new Profilo("SX12.153", "Telaio esterno (via singola)", Categoria.TELAIO, 1.604);
+    private static final Profilo CARTER = new Profilo("SX12.501", "Carter per telaio", Categoria.TELAIO, 0.283);
+    private static final Profilo ANTA = new Profilo("SX12.203", "Anta (vetro infilare)", Categoria.ANTA, 1.142);
+    private static final Profilo ANTA_RIDOTTA = new Profilo("SX12.204", "Anta (vetro infilare ridotta)", Categoria.ANTA, 0.832);
+    private static final Profilo ANTA_ANGOLO = new Profilo("SX12.205", "Anta (vetro infilare per angolo)", Categoria.ANTA, 0.987);
+    private static final Profilo INCONTRO = new Profilo("SX12.301", "Incontro centrale", Categoria.MONTANTE, 1.204);
+    private static final Profilo INCONTRO_4ANTE = new Profilo("SX12.303", "Incontro (per 4 ante)", Categoria.MONTANTE, 0.766);
+    private static final Profilo INCONTRO_ANGOLO = new Profilo("SX12.305", "Incontro angolo (assieme .304/.305/.306)", Categoria.MONTANTE, 1.385);
 
     // --- Formule di comodo -------------------------------------------------------------
     private static Formula perL(double offset) {
@@ -97,6 +102,15 @@ public final class CatalogoSX120 {
                 new RegolaTaglio("Telaio esterno (traverso)", p, perL(0), 1, TAGLIO_45_45));
     }
 
+    /**
+     * La "distinta di taglio vetri" della scheda: una lastra per anta, sempre {@code anta − 78} su
+     * entrambi i lati (verifica: anta {@code H−63} → vetro {@code H−141}; soglia ribassata anta
+     * {@code H−36} → vetro {@code H−114}). Qui le quote restano in H e L come le stampa il catalogo.
+     */
+    private static List<RegolaVetro> vetro(int quantita, Formula h, Formula l) {
+        return List.of(new RegolaVetro("Vetro", h, l, quantita));
+    }
+
     @SafeVarargs
     private static List<RegolaTaglio> regole(List<RegolaTaglio>... blocchi) {
         List<RegolaTaglio> tutte = new ArrayList<>();
@@ -121,6 +135,7 @@ public final class CatalogoSX120 {
     }
 
     // #1 - Scomparsa: 1 anta a scomparsa (binario singolo). Ante e incontro in singola copia.
+    // Vetro: 1 × (H−141) × (L/2−68).
     private static Tipologia scomparsa() {
         return new Tipologia("Finestra scorrevole a scomparsa", regole(
                 List.of(new RegolaTaglio("Telaio (binario)", BINARIO_SINGOLO, perL(42), 1, TAGLIO_90_90)),
@@ -130,7 +145,8 @@ public final class CatalogoSX120 {
                         new RegolaTaglio("Anta (lato verticale)", ANTA, perH(63), 1, TAGLIO_45_45),
                         new RegolaTaglio("Anta ridotta (lato orizzontale)", ANTA_RIDOTTA, perMezzaL(26), 1, TAGLIO_45_45),
                         new RegolaTaglio("Anta ridotta (lato verticale)", ANTA_RIDOTTA, perH(99), 1, TAGLIO_45_45),
-                        new RegolaTaglio("Incontro centrale", INCONTRO, perH(76), 1, TAGLIO_90_90))));
+                        new RegolaTaglio("Incontro centrale", INCONTRO, perH(76), 1, TAGLIO_90_90))),
+                vetro(1, perH(141), perMezzaL(68)));
     }
 
     // Aste comuni alle 2 ante "mm.110" (binario SX11.101): telaio + carter + ante.
@@ -146,19 +162,22 @@ public final class CatalogoSX120 {
                         new RegolaTaglio("Anta ridotta (lato verticale)", ANTA_RIDOTTA, perH(99), 2, TAGLIO_45_45)));
     }
 
-    // #2 - 2 ante mobile+mobile: comuni + incontro H−121 ×2.
+    // #2 - 2 ante mobile+mobile: comuni + incontro H−121 ×2. Vetro: 2 × (H−141) × (L/2−68).
     private static Tipologia dueAnteMobili() {
         return new Tipologia("Finestra scorrevole a 2 ante (mobile + mobile)", regole(comuniDueAnte(),
-                List.of(new RegolaTaglio("Incontro centrale", INCONTRO, perH(121), 2, TAGLIO_90_90))));
+                List.of(new RegolaTaglio("Incontro centrale", INCONTRO, perH(121), 2, TAGLIO_90_90))),
+                vetro(2, perH(141), perMezzaL(68)));
     }
 
     // #2 - 2 ante fisso+mobile: comuni + incontro H−121 ×1 e H−115 ×1 + carter L/2−94 ×1.
+    // Stessa scheda vetri della mobile+mobile.
     private static Tipologia dueAnteFissoMobile() {
         return new Tipologia("Finestra scorrevole a 2 ante (fisso + mobile)", regole(comuniDueAnte(),
                 List.of(
                         new RegolaTaglio("Incontro centrale", INCONTRO, perH(121), 1, TAGLIO_90_90),
                         new RegolaTaglio("Incontro centrale", INCONTRO, perH(115), 1, TAGLIO_90_90),
-                        new RegolaTaglio("Carter per telaio (fisso)", CARTER, perMezzaL(94), 1, TAGLIO_90_90))));
+                        new RegolaTaglio("Carter per telaio (fisso)", CARTER, perMezzaL(94), 1, TAGLIO_90_90))),
+                vetro(2, perH(141), perMezzaL(68)));
     }
 
     // Aste comuni alle 2 ante "soglia ribassata" (binario SX11.176).
@@ -175,18 +194,22 @@ public final class CatalogoSX120 {
     }
 
     // #3 - 2 ante soglia ribassata mobile+mobile: comuni + incontro H−94 ×2.
+    // Vetro: 2 × (H−114) × (L/2−68): l'anta ribassata è 27 mm più alta, e il vetro con lei.
     private static Tipologia dueAnteRibassataMobili() {
         return new Tipologia("Finestra scorrevole a 2 ante, soglia ribassata (mobile + mobile)", regole(comuniRibassata(),
-                List.of(new RegolaTaglio("Incontro centrale", INCONTRO, perH(94), 2, TAGLIO_90_90))));
+                List.of(new RegolaTaglio("Incontro centrale", INCONTRO, perH(94), 2, TAGLIO_90_90))),
+                vetro(2, perH(114), perMezzaL(68)));
     }
 
     // #3 - 2 ante soglia ribassata fisso+mobile: comuni + incontro H−94 ×1 e H−88 ×1 + carter L/2−94 ×1.
+    // Stessa scheda vetri della mobile+mobile ribassata.
     private static Tipologia dueAnteRibassataFissoMobile() {
         return new Tipologia("Finestra scorrevole a 2 ante, soglia ribassata (fisso + mobile)", regole(comuniRibassata(),
                 List.of(
                         new RegolaTaglio("Incontro centrale", INCONTRO, perH(94), 1, TAGLIO_90_90),
                         new RegolaTaglio("Incontro centrale", INCONTRO, perH(88), 1, TAGLIO_90_90),
-                        new RegolaTaglio("Carter per telaio (fisso)", CARTER, perMezzaL(94), 1, TAGLIO_90_90))));
+                        new RegolaTaglio("Carter per telaio (fisso)", CARTER, perMezzaL(94), 1, TAGLIO_90_90))),
+                vetro(2, perH(114), perMezzaL(68)));
     }
 
     // Ante + incontro comuni alle 3 ante: ante L/3+29.35 / L/3−6.65, incontro H−121 ×4.
@@ -200,24 +223,28 @@ public final class CatalogoSX120 {
     }
 
     // #4 - 3 ante fisso centrale: binario SX11.101 (2 vie); carter H−94 ×2.
+    // Vetro: 3 × (H−141) × (L/3−48.65).
     private static Tipologia treAnteFissoCentrale() {
         return new Tipologia("Finestra scorrevole a 3 ante, fisso centrale", regole(
                 List.of(new RegolaTaglio("Telaio (binario)", BINARIO_2VIE, perL(42), 1, TAGLIO_90_90)),
                 telaioEsterno(ESTERNO),
                 List.of(new RegolaTaglio("Carter per telaio", CARTER, perH(94), 2, TAGLIO_90_90)),
-                anteTreAnte()));
+                anteTreAnte()),
+                vetro(3, perH(141), terzoL(48.65)));
     }
 
-    // #5 - 3 ante: binario SX11.130 (3 vie); carter H−94 ×4.
+    // #5 - 3 ante: binario SX11.130 (3 vie); carter H−94 ×4. Stessa scheda vetri della #4.
     private static Tipologia treAnte() {
         return new Tipologia("Finestra scorrevole a 3 ante", regole(
                 List.of(new RegolaTaglio("Telaio (binario)", BINARIO_3VIE, perL(42), 1, TAGLIO_90_90)),
                 telaioEsterno(ESTERNO),
                 List.of(new RegolaTaglio("Carter per telaio", CARTER, perH(94), 4, TAGLIO_90_90)),
-                anteTreAnte()));
+                anteTreAnte()),
+                vetro(3, perH(141), terzoL(48.65)));
     }
 
     // #6 - 4 ante: binario SX11.101; ante L/4+24 / L/4−12; incontro SX12.301 ×4 + SX12.303 ×2.
+    // Vetro: 4 × (H−141) × (L/4−54).
     private static Tipologia quattroAnte() {
         return new Tipologia("Finestra scorrevole a 4 ante", regole(
                 List.of(new RegolaTaglio("Telaio (binario)", BINARIO_2VIE, perL(42), 1, TAGLIO_90_90)),
@@ -229,11 +256,13 @@ public final class CatalogoSX120 {
                         new RegolaTaglio("Anta ridotta (lato orizzontale)", ANTA_RIDOTTA, quartoL(12), 4, TAGLIO_45_45),
                         new RegolaTaglio("Anta ridotta (lato verticale)", ANTA_RIDOTTA, perH(99), 5, TAGLIO_45_45),
                         new RegolaTaglio("Incontro centrale", INCONTRO, perH(121), 4, TAGLIO_90_90),
-                        new RegolaTaglio("Incontro (per 4 ante)", INCONTRO_4ANTE, perH(121), 2, TAGLIO_90_90))));
+                        new RegolaTaglio("Incontro (per 4 ante)", INCONTRO_4ANTE, perH(121), 2, TAGLIO_90_90))),
+                vetro(4, perH(141), quartoL(54)));
     }
 
     // #7 - 4 ante con angolo: binario SX11.101 L−21 ×2 (poi a 45°); ante L/2−33 / L/2−69 + anta angolo
     // SX12.205; nodo angolo SX12.304/305/306. Cut angolo reso 90/90 (ripresa a 45° manuale).
+    // Vetro: 4 × (H−141) × (L/2−111): qui L è il lato dell'angolo, non la luce totale.
     private static Tipologia quattroAnteConAngolo() {
         return new Tipologia("Finestra scorrevole a 4 ante con angolo", regole(
                 List.of(new RegolaTaglio("Telaio (binario, poi a 45°)", BINARIO_2VIE, perL(21), 2, TAGLIO_90_90)),
@@ -246,6 +275,7 @@ public final class CatalogoSX120 {
                         new RegolaTaglio("Anta ridotta (lato orizzontale)", ANTA_RIDOTTA, perMezzaL(69), 4, TAGLIO_45_45),
                         new RegolaTaglio("Anta ridotta (lato verticale)", ANTA_RIDOTTA, perH(99), 4, TAGLIO_45_45),
                         new RegolaTaglio("Incontro centrale", INCONTRO, perH(121), 4, TAGLIO_90_90),
-                        new RegolaTaglio("Incontro angolo", INCONTRO_ANGOLO, perH(121), 1, TAGLIO_90_90))));
+                        new RegolaTaglio("Incontro angolo", INCONTRO_ANGOLO, perH(121), 1, TAGLIO_90_90))),
+                vetro(4, perH(141), perMezzaL(111)));
     }
 }

@@ -23,6 +23,7 @@
                     <items>
                         <!-- Le voci mm/cm/m le aggiunge SchermataPrincipale: una per ogni Unita. -->
                         <Menu fx:id="menuUnita" text="Unita' di misura"/>
+                        <MenuItem text="Prezzi del materiale..." onAction="#apriPrezzi"/>
                         <SeparatorMenuItem/>
                         <MenuItem text="Esci" onAction="#esci"/>
                     </items>

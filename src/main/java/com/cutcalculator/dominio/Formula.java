@@ -18,4 +18,17 @@ public record Formula(double cL, double cH, double cHF, double cost) {
     public double calcola(Dimensione d) {
         return cL * d.L() + cH * d.H() + cHF * d.HF() + cost;
     }
+
+    /**
+     * La stessa formula con una detrazione in più, cioè {@code questa − offset}.
+     * <p>
+     * Serve a <b>derivare una quota da un'altra</b> restando in una sola formula lineare: nelle schede
+     * SX 110, per esempio, il vetro non è quotato sul serramento ma sull'<b>anta</b>
+     * ({@code Hₐ − 140}), e l'anta a sua volta sul serramento ({@code Hₐ = H − 78}). Comporre le due
+     * con questo metodo tiene la derivazione visibile nel catalogo, invece di scriverci il risultato
+     * già fatto ({@code H − 218}) che nessuno saprebbe più ricondurre alla scheda.
+     */
+    public Formula meno(double offset) {
+        return new Formula(cL, cH, cHF, cost - offset);
+    }
 }

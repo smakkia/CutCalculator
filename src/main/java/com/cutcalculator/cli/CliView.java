@@ -12,10 +12,12 @@ import com.cutcalculator.dominio.Dimensione;
 import com.cutcalculator.dominio.Materiale;
 import com.cutcalculator.dominio.Ordine;
 import com.cutcalculator.dominio.Pezzo;
+import com.cutcalculator.dominio.Prezzi;
 import com.cutcalculator.dominio.Profilo;
 import com.cutcalculator.dominio.Serramento;
 import com.cutcalculator.dominio.Tipologia;
 import com.cutcalculator.dominio.TipoTaglio;
+import com.cutcalculator.dominio.Vetro;
 import com.cutcalculator.formule.Distinta;
 import com.cutcalculator.ottimizzatore.BarraTagliata;
 import com.cutcalculator.ottimizzatore.Ottimizzatore;
@@ -23,6 +25,7 @@ import com.cutcalculator.ottimizzatore.PianoDiTaglio;
 import com.cutcalculator.pianificazione.EvasioneOrdini;
 import com.cutcalculator.preventivo.Preventivo;
 import com.cutcalculator.preventivo.RigaProfilo;
+import com.cutcalculator.preventivo.RigaVetro;
 
 import java.util.Comparator;
 import java.util.List;
@@ -77,11 +80,13 @@ public final class CliView implements View {
         System.out.println("  1) Magazzino  (" + conta(controller.totaleAvanzi(), "pezzo", "pezzi") + ")");
         System.out.println("  2) Ordini     (" + conta(controller.ordini().size(), "ordine", "ordini") + ")");
         System.out.println("  3) Unita' di misura  (" + controller.unita().descrizione() + ")");
+        System.out.println("  4) Prezzi del materiale  (" + descrizionePrezzi() + ")");
         System.out.println("  0) Esci");
-        switch (leggiIntero("Scelta", 0, 3)) {
+        switch (leggiIntero("Scelta", 0, 4)) {
             case 1 -> menuMagazzino();
             case 2 -> menuOrdini();
             case 3 -> scegliUnita();
+            case 4 -> impostaPrezzi();
             case 0 -> {
                 return false;
             }
@@ -97,6 +102,30 @@ public final class CliView implements View {
         Unita scelta = scegliDaLista("Unita' di misura:", List.of(Unita.values()), Unita::descrizione);
         controller.impostaUnita(scelta);
         System.out.println("  Misure in " + scelta.descrizione() + ".");
+    }
+
+    /**
+     * Il listino con cui valorizzare il preventivo: l'alluminio si paga a peso, il vetro a
+     * superficie. Sono dati dell'utente (variano col fornitore), quindi si inseriscono a mano; a
+     * zero valgono "non impostato" e i costi restano zero invece di uscire sbagliati.
+     */
+    private void impostaPrezzi() {
+        Prezzi attuali = controller.prezzi();
+        System.out.println();
+        System.out.println("Prezzi del materiale (0 = non impostato, lascia vuoto per non cambiare).");
+        double barre = leggiPrezzo("Prezzo alluminio (EUR/kg)", attuali.alChiloBarre());
+        double vetro = leggiPrezzo("Prezzo vetro (EUR/mq)", attuali.alMqVetro());
+        controller.impostaPrezzi(new Prezzi(barre, vetro));
+        System.out.println("  " + descrizionePrezzi() + ".");
+    }
+
+    /** Il listino in una riga, per il menu. */
+    private String descrizionePrezzi() {
+        Prezzi prezzi = controller.prezzi();
+        if (!prezzi.impostati()) {
+            return "non impostati";
+        }
+        return euro(prezzi.alChiloBarre()) + "/kg, " + euro(prezzi.alMqVetro()) + "/mq";
     }
 
     // --- Sezione MAGAZZINO -------------------------------------------------------------
@@ -188,12 +217,14 @@ public final class CliView implements View {
         boolean resta = true;
         while (resta) {
             System.out.println();
-            System.out.println("=== ORDINI (" + conta(controller.ordini().size(), "ordine", "ordini") + ") ===");
+            System.out.printf("=== ORDINI (%s: %d da calcolare, %d calcolati) ===%n",
+                    conta(controller.ordini().size(), "ordine", "ordini"),
+                    controller.ordiniDaCalcolare().size(), controller.ordiniCalcolati().size());
             System.out.println("  1) Nuovo ordine");
             System.out.println("  2) Mostra ordini");
             System.out.println("  3) Apri ordine");
             System.out.println("  4) Rimuovi ordine");
-            System.out.println("  5) Calcola tutti gli ordini (scarico magazzino)");
+            System.out.println("  5) Calcola gli ordini da calcolare (scarico magazzino)");
             System.out.println("  6) Salva ordini su file");
             System.out.println("  7) Carica ordini da file");
             System.out.println("  0) Indietro");
@@ -218,17 +249,33 @@ public final class CliView implements View {
         gestisciOrdine(ordine);
     }
 
+    /**
+     * Gli ordini divisi in <b>da calcolare</b> e <b>calcolati</b>. I numeri restano quelli della
+     * lista unica: le due sezioni sono solo un modo di leggerla, non due elenchi diversi, cosi'
+     * "apri" e "rimuovi" continuano a funzionare con lo stesso numero che si vede qui.
+     */
     private void mostraOrdini() {
         List<Ordine> ordini = controller.ordini();
         if (ordini.isEmpty()) {
             System.out.println("  Nessun ordine: creane uno (opzione 1).");
             return;
         }
-        System.out.println("Ordini:");
+        elencaOrdini("DA CALCOLARE", ordini, false);
+        elencaOrdini("CALCOLATI", ordini, true);
+    }
+
+    /** Una delle due sezioni; niente intestazione se non c'e' nessun ordine in quello stato. */
+    private void elencaOrdini(String titolo, List<Ordine> ordini, boolean calcolati) {
+        if (ordini.stream().noneMatch(o -> o.calcolato() == calcolati)) {
+            return;
+        }
+        System.out.println(titolo + ":");
         for (int i = 0; i < ordini.size(); i++) {
             Ordine o = ordini.get(i);
-            System.out.printf("  %d) %-30s (%s)%n", i + 1, o.nome(),
-                    conta(o.totaleSerramenti(), "serramento", "serramenti"));
+            if (o.calcolato() == calcolati) {
+                System.out.printf("  %d) %-30s (%s)%n", i + 1, o.nome(),
+                        conta(o.totaleSerramenti(), "serramento", "serramenti"));
+            }
         }
     }
 
@@ -260,17 +307,23 @@ public final class CliView implements View {
     }
 
     /**
-     * Calcolo globale su tutti gli ordini: chiede conferma (è distruttivo per il magazzino), poi
-     * delega al controller che pianifica, <b>scarica</b> gli avanzi usati, fa rientrare i ritagli
-     * sopra soglia e salva. Mostra i piani per ordine e il preventivo totale.
+     * Calcolo globale: prende gli ordini <b>da calcolare</b> (quelli gia' calcolati restano fuori,
+     * il loro materiale e' gia' stato scalato), chiede conferma perche' e' distruttivo per il
+     * magazzino, poi delega al controller che pianifica, <b>scarica</b> gli avanzi usati, fa
+     * rientrare i ritagli sopra soglia, salva e segna gli ordini come calcolati.
      */
     private void evadiOrdini() {
-        boolean qualcosaDaFare = controller.ordini().stream().anyMatch(o -> !o.serramenti().isEmpty());
-        if (!qualcosaDaFare) {
-            System.out.println("  Nessun ordine con serramenti da calcolare.");
+        List<Ordine> daCalcolare = controller.ordiniDaCalcolare();
+        if (daCalcolare.stream().allMatch(o -> o.serramenti().isEmpty())) {
+            System.out.println(daCalcolare.isEmpty()
+                    ? "  Nessun ordine da calcolare: sono gia' tutti calcolati."
+                    : "  Gli ordini da calcolare sono vuoti: aggiungi almeno un serramento.");
             return;
         }
-        System.out.printf("  Il calcolo globale scarica il magazzino: gli avanzi usati vengono consumati e"
+        System.out.println("  Verranno calcolati insieme:");
+        daCalcolare.forEach(o -> System.out.printf("    - %-30s (%s)%n", o.nome(),
+                conta(o.totaleSerramenti(), "serramento", "serramenti")));
+        System.out.printf("  Il calcolo scarica il magazzino: gli avanzi usati vengono consumati e"
                 + " i ritagli >= %s rientrano. L'operazione salva su disco.%n", mis(controller.sogliaRitaglio()));
         if (!prompt("  Confermi? [s/N]> ").trim().equalsIgnoreCase("s")) {
             System.out.println("  Annullato: magazzino invariato.");
@@ -280,6 +333,8 @@ public final class CliView implements View {
             evasione(controller.evadiOrdini());
             System.out.printf("%n  Magazzino aggiornato e salvato (%s).%n",
                     conta(controller.totaleAvanzi(), "pezzo", "pezzi"));
+            System.out.printf("  %s ora tra i calcolati.%n",
+                    conta(daCalcolare.size(), "ordine passato", "ordini passati"));
         } catch (IllegalArgumentException pezzoTroppoLungo) {
             System.out.println("  Impossibile calcolare: " + pezzoTroppoLungo.getMessage());
         }
@@ -320,19 +375,18 @@ public final class CliView implements View {
         while (resta) {
             System.out.println();
             System.out.println("=== ORDINE: " + ordine.nome() + "  ("
-                    + conta(ordine.totaleSerramenti(), "serramento", "serramenti") + ") ===");
+                    + conta(ordine.totaleSerramenti(), "serramento", "serramenti") + ")  ["
+                    + (ordine.calcolato() ? "calcolato" : "da calcolare") + "] ===");
             System.out.println("  1) Aggiungi serramento");
             System.out.println("  2) Mostra serramenti");
             System.out.println("  3) Rimuovi serramento");
-            System.out.println("  4) Calcola (distinta + piano + preventivo)");
-            System.out.println("  5) Rinomina ordine");
+            System.out.println("  4) Rinomina ordine");
             System.out.println("  0) Indietro");
-            switch (leggiIntero("Scelta", 0, 5)) {
+            switch (leggiIntero("Scelta", 0, 4)) {
                 case 1 -> aggiungiSerramento(ordine);
                 case 2 -> ordine(ordine);
                 case 3 -> rimuoviSerramento(ordine);
-                case 4 -> calcola(ordine);
-                case 5 -> rinominaOrdine(ordine);
+                case 4 -> rinominaOrdine(ordine);
                 case 0 -> resta = false;
             }
         }
@@ -377,22 +431,9 @@ public final class CliView implements View {
         System.out.println("  Rinominato: " + ordine.nome());
     }
 
-    private void calcola(Ordine ordine) {
-        if (ordine.serramenti().isEmpty()) {
-            System.out.println("  Ordine vuoto: aggiungi almeno un serramento (opzione 1).");
-            return;
-        }
-        try {
-            Controller.Risultato risultato = controller.calcola(ordine);
-            distinta(risultato.distinta());
-            piano(risultato.piano());
-            sfridi(risultato.piano());
-            preventivo(risultato.preventivo());
-        } catch (IllegalArgumentException pezzoTroppoLungo) {
-            // Es.: un pezzo piu' lungo della barra standard da 6500 mm.
-            System.out.println("  Impossibile ottimizzare: " + pezzoTroppoLungo.getMessage());
-        }
-    }
+    // Il "calcolo provvisorio" del singolo ordine (anteprima non distruttiva) e' stato tolto:
+    // mostrava un piano che il calcolo globale poi rifaceva diverso, perche' li' gli ordini si
+    // uniscono e i pezzi condividono le barre. Un solo calcolo, quello che conta.
 
     // --- Scelte dal catalogo -----------------------------------------------------------
 
@@ -496,6 +537,28 @@ public final class CliView implements View {
         return num(1500) + " o " + num(1476.5);
     }
 
+    /**
+     * Un prezzo in euro: virgola o punto, mai negativo. Riga vuota = tieni il valore attuale, cosi'
+     * chi vuole cambiare un solo prezzo non deve ridigitare l'altro.
+     */
+    private double leggiPrezzo(String etichetta, double attuale) {
+        while (true) {
+            String riga = prompt(etichetta + " [" + euro(attuale) + "]> ").trim().replace(',', '.');
+            if (riga.isEmpty()) {
+                return attuale;
+            }
+            try {
+                double valore = Double.parseDouble(riga);
+                if (valore >= 0) {
+                    return valore;
+                }
+            } catch (NumberFormatException ignored) {
+                // ricade nel messaggio sotto
+            }
+            System.out.println("  Inserisci un prezzo non negativo (es. 6,50) oppure 0.");
+        }
+    }
+
     /** Stampa il prompt e legge una riga; {@link NoSuchElementException} a fine input = uscita. */
     private String prompt(String testo) {
         System.out.print(testo);
@@ -565,6 +628,24 @@ public final class CliView implements View {
                     "-", etichetta(materiale), materiale.profilo().categoria(), pezzi.size());
             System.out.printf("     %s%n", riepilogoPezzi(pezzi));
         });
+        vetriDistinta(distinta);
+    }
+
+    /**
+     * Le lastre della distinta. Le misure seguono l'unita' scelta dall'utente, l'area no: il vetro
+     * si compra a metro quadro, e in mm quadri i numeri sarebbero illeggibili.
+     */
+    private void vetriDistinta(Distinta distinta) {
+        if (distinta.vetri().isEmpty()) {
+            System.out.printf("%n(nessuna quota vetro per queste tipologie)%n");
+            return;
+        }
+        System.out.printf("%nVETRI - %s, %s in totale%n",
+                conta(distinta.totaleLastre(), "lastra", "lastre"), mq(distinta.areaVetroTotaleMq()));
+        for (Vetro v : distinta.vetri()) {
+            System.out.printf("  - %9s x %-9s x%-3d  %s%n",
+                    mis(v.lunghezza()), mis(v.larghezza()), v.quantita(), mq(v.areaTotaleMq()));
+        }
     }
 
     @Override
@@ -611,19 +692,21 @@ public final class CliView implements View {
     @Override
     public void preventivo(Preventivo preventivo) {
         sezione("PREVENTIVO (materiale profili)  -  misure in " + simbolo());
-        String riga = "%-28s %-10s %11s %7s %13s %11s %8s %13s%n";
+        String riga = "%-28s %-10s %11s %7s %13s %11s %8s %13s %10s %12s%n";
         System.out.printf(riga, "Profilo", "Colore", "Barre nuove", "Avanzi", "Lungh. nuova",
-                "Sfrido", "Ritagli", "Da riusare");
-        System.out.println("-".repeat(107));
+                "Sfrido", "Ritagli", "Da riusare", "Peso (kg)", "Costo");
+        System.out.println("-".repeat(131));
         for (RigaProfilo r : preventivo.righe()) {
             System.out.printf(riga, tronca(etichetta(r.profilo()), 28), r.colore().nome(), r.barreNuove(),
                     r.avanziUsati(), num(r.lunghezzaNuova()), num(r.sfrido()),
-                    r.ritagliRecuperabili(), num(r.lunghezzaRecuperabile()));
+                    r.ritagliRecuperabili(), num(r.lunghezzaRecuperabile()),
+                    kg(r.peso()), euro(r.costo(preventivo.prezzi())));
         }
-        System.out.println("-".repeat(107));
+        System.out.println("-".repeat(131));
         System.out.printf(riga, "TOTALE", "", preventivo.totaleBarreNuove(), preventivo.totaleAvanziUsati(),
                 num(preventivo.lunghezzaNuovaTotale()), num(preventivo.sfridoTotale()),
-                preventivo.totaleRitagliRecuperabili(), num(preventivo.lunghezzaRecuperabileTotale()));
+                preventivo.totaleRitagliRecuperabili(), num(preventivo.lunghezzaRecuperabileTotale()),
+                kg(preventivo.pesoTotale()), euro(preventivo.costoBarre()));
 
         System.out.printf("%nMateriale d'acquisto: %d barre da %s  =  %s lineari.%n",
                 preventivo.totaleBarreNuove(), mis(Ottimizzatore.BARRA_STANDARD_DEFAULT),
@@ -633,6 +716,56 @@ public final class CliView implements View {
                 conta(preventivo.totaleRitagliRecuperabili(), "ritaglio", "ritagli"),
                 mis(controller.sogliaRitaglio()), mis(preventivo.lunghezzaRecuperabileTotale()),
                 mis(preventivo.scartoTotale()));
+        preventivoVetri(preventivo);
+        costiPreventivo(preventivo);
+    }
+
+    /** Le lastre da ordinare al vetraio, aggregate per misura: quantita' e metri quadri. */
+    private void preventivoVetri(Preventivo preventivo) {
+        if (preventivo.righeVetro().isEmpty()) {
+            return;
+        }
+        sezione("PREVENTIVO (vetro)  -  misure in " + simbolo() + ", aree in mq");
+        String riga = "%14s %14s %10s %12s %12s %12s%n";
+        System.out.printf(riga, "Altezza (H)", "Larghezza (L)", "Quantita'", "Area lastra",
+                "Area totale", "Costo");
+        System.out.println("-".repeat(79));
+        for (RigaVetro r : preventivo.righeVetro()) {
+            System.out.printf(riga, num(r.lunghezza()), num(r.larghezza()), r.quantita(),
+                    mq(r.areaMq()), mq(r.areaTotaleMq()), euro(r.costo(preventivo.prezzi())));
+        }
+        System.out.println("-".repeat(79));
+        System.out.printf(riga, "TOTALE", "", preventivo.totaleLastre(), "",
+                mq(preventivo.areaVetroTotaleMq()), euro(preventivo.costoVetro()));
+        System.out.printf("%nDa ordinare al vetraio: %s, %s di superficie.%n",
+                conta(preventivo.totaleLastre(), "lastra", "lastre"), mq(preventivo.areaVetroTotaleMq()));
+    }
+
+    /**
+     * Il conto dell'ordine: barre nuove + vetro. Se manca un prezzo lo dice invece di mostrare uno
+     * zero che sembrerebbe un calcolo riuscito; il peso a zero significa che i profili del catalogo
+     * non hanno ancora i kg/m di scheda.
+     */
+    private void costiPreventivo(Preventivo preventivo) {
+        sezione("COSTO DEL MATERIALE");
+        Prezzi prezzi = preventivo.prezzi();
+        System.out.printf("Listino: alluminio %s/kg  |  vetro %s/mq%n",
+                euro(prezzi.alChiloBarre()), euro(prezzi.alMqVetro()));
+        String riga = "  %-28s %14s%n";
+        System.out.printf(riga, "Barre nuove (" + kg(preventivo.pesoTotale()) + " kg)",
+                euro(preventivo.costoBarre()));
+        System.out.printf(riga, "Vetro (" + mq(preventivo.areaVetroTotaleMq()) + ")",
+                euro(preventivo.costoVetro()));
+        System.out.println("  " + "-".repeat(43));
+        System.out.printf(riga, "TOTALE ORDINE", euro(preventivo.costoTotale()));
+
+        if (!prezzi.impostati()) {
+            System.out.println("\n  (prezzi non impostati: menu principale -> Prezzi del materiale)");
+        }
+        if (prezzi.alChiloBarre() > 0 && preventivo.pesoTotale() == 0) {
+            System.out.println("\n  (peso a zero: i profili del catalogo non hanno ancora i kg/m,"
+                    + " quindi le barre non si possono valorizzare)");
+        }
     }
 
     /**
@@ -690,6 +823,25 @@ public final class CliView implements View {
     /** Il simbolo dell'unita' corrente, per le intestazioni e i prompt. */
     private String simbolo() {
         return controller.unita().simbolo();
+    }
+
+    /**
+     * Un'area in metri quadri. Il vetro si compra a mq qualunque sia l'unita' scelta per le
+     * lunghezze, quindi qui non si converte nulla. Scritto "mq" e non con l'esponente: l'output
+     * di questa view resta puro ASCII.
+     */
+    private static String mq(double areaMq) {
+        return String.format("%.3f mq", areaMq);
+    }
+
+    /** Un importo in euro. Scritto "EUR" e non con il simbolo: questa view resta puro ASCII. */
+    private static String euro(double importo) {
+        return String.format("%.2f EUR", importo);
+    }
+
+    /** Un peso in chilogrammi (senza unita': sta nell'intestazione di colonna). */
+    private static String kg(double chili) {
+        return String.format("%.2f", chili);
     }
 
     /** Accorcia un'etichetta troppo lunga per la sua colonna, cosi' la tabella resta allineata. */

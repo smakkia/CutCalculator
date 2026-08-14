@@ -110,6 +110,24 @@ public class BarraTagliata {
         return KERF;
     }
 
+    /** Peso (kg) della barra <b>intera</b>, sfrido compreso: è quello che si compra e si trasporta. */
+    public double peso() {
+        return profilo.peso(lunghezzaBarra);
+    }
+
+    /** Peso (kg) dei soli pezzi utili ricavati: il netto, senza sfrido né kerf. */
+    public double pesoPezzi() {
+        return pezzi.stream().mapToDouble(Pezzo::peso).sum();
+    }
+
+    /**
+     * Costo (€) della barra intera: peso × prezzo al chilo. Si paga tutta la barra, anche la
+     * parte che finirà in sfrido — per questo il prezzo si calcola sulla lunghezza grezza.
+     */
+    public double prezzo() {
+        return profilo.prezzo(lunghezzaBarra);
+    }
+
     /** Vista in sola lettura dei pezzi collocati, nell'ordine di taglio. */
     public List<Pezzo> pezzi() {
         return List.copyOf(pezzi);

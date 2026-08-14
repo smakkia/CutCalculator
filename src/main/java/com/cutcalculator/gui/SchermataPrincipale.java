@@ -117,6 +117,18 @@ public final class SchermataPrincipale {
         mostraCatalogo(controller.catalogo());
     }
 
+    /**
+     * Il listino (€/kg dell'alluminio, €/mq del vetro). Cambiandolo si rifà solo la vista dei
+     * risultati: i costi sono derivati, quindi basta ricalcolarli sull'ultimo preventivo mostrato.
+     */
+    @FXML
+    private void apriPrezzi() {
+        DialogoPrezzi.chiedi(controller.prezzi()).ifPresent(prezzi -> {
+            controller.impostaPrezzi(prezzi);
+            risultatiController.aggiornaPrezzi();
+        });
+    }
+
     // --- Viste (chiamate da GuiFx) -----------------------------------------------------
 
     /** Elenca sistemi e tipologie disponibili: in GUI il catalogo serve da consultazione. */
@@ -173,12 +185,6 @@ public final class SchermataPrincipale {
     public void mostraEvasione(EvasioneOrdini evasione) {
         risultatiController.mostraEvasione(evasione);
         magazzinoController.aggiorna();
-        schede.getSelectionModel().select(schedaRisultati);
-    }
-
-    /** Il risultato di un'anteprima (un solo ordine): distinta, piano e preventivo insieme. */
-    public void mostraRisultato(Controller.Risultato risultato, String titolo) {
-        risultatiController.mostraRisultato(risultato, titolo);
         schede.getSelectionModel().select(schedaRisultati);
     }
 }

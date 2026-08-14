@@ -5,6 +5,7 @@ import com.cutcalculator.app.Etichette;
 import com.cutcalculator.dominio.Avanzo;
 import com.cutcalculator.dominio.Materiale;
 import com.cutcalculator.dominio.Pezzo;
+import com.cutcalculator.dominio.Prezzi;
 import com.cutcalculator.dominio.TipoTaglio;
 import com.cutcalculator.formule.Distinta;
 import com.cutcalculator.ottimizzatore.BarraTagliata;
@@ -12,6 +13,7 @@ import com.cutcalculator.ottimizzatore.PianoDiTaglio;
 import com.cutcalculator.pianificazione.EvasioneOrdini;
 import com.cutcalculator.preventivo.Preventivo;
 import com.cutcalculator.preventivo.RigaProfilo;
+import com.cutcalculator.preventivo.RigaVetro;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -78,13 +80,28 @@ public final class SchermataRisultati {
     @FXML private TableColumn<RigaProfilo, String> preventivoSfrido;
     @FXML private TableColumn<RigaProfilo, String> preventivoRitagli;
     @FXML private TableColumn<RigaProfilo, String> preventivoRecuperabile;
+    @FXML private TableColumn<RigaProfilo, String> preventivoPeso;
+    @FXML private TableColumn<RigaProfilo, String> preventivoCosto;
     @FXML private Label totaliPreventivo;
+    @FXML private Label costiPreventivo;
+
+    @FXML private Tab schedaVetri;
+    @FXML private TableView<RigaVetro> tabellaVetri;
+    @FXML private TableColumn<RigaVetro, String> vetriAltezza;
+    @FXML private TableColumn<RigaVetro, String> vetriLarghezza;
+    @FXML private TableColumn<RigaVetro, String> vetriQuantita;
+    @FXML private TableColumn<RigaVetro, String> vetriAreaLastra;
+    @FXML private TableColumn<RigaVetro, String> vetriAreaTotale;
+    @FXML private TableColumn<RigaVetro, String> vetriCosto;
+    @FXML private Label totaliVetri;
 
     private final ObservableList<RigaDistinta> righeDistinta = FXCollections.observableArrayList();
     private final ObservableList<BarraTagliata> righeSfridi = FXCollections.observableArrayList();
     private final ObservableList<RigaProfilo> righePreventivo = FXCollections.observableArrayList();
+    private final ObservableList<RigaVetro> righeVetri = FXCollections.observableArrayList();
 
     private Controller controller;
+    private Preventivo preventivoMostrato;
 
     /** Una riga della distinta: pezzi uguali (stesso materiale, lunghezza e taglio) contati insieme. */
     public record RigaDistinta(Materiale materiale, double lunghezza, TipoTaglio taglio, long quantita) {
@@ -158,11 +175,33 @@ public final class SchermataRisultati {
                 new ReadOnlyStringWrapper(String.valueOf(riga.getValue().ritagliRecuperabili())));
         preventivoRecuperabile.setCellValueFactory(riga ->
                 new ReadOnlyStringWrapper(misura(riga.getValue().lunghezzaRecuperabile())));
+        preventivoPeso.setCellValueFactory(riga ->
+                new ReadOnlyStringWrapper(kg(riga.getValue().peso())));
+        preventivoCosto.setCellValueFactory(riga ->
+                new ReadOnlyStringWrapper(euro(riga.getValue().costo(prezzi()))));
         allineaDestra(preventivoBarreNuove, preventivoAvanzi, preventivoLunghezza, preventivoSfrido,
-                preventivoRitagli, preventivoRecuperabile);
+                preventivoRitagli, preventivoRecuperabile, preventivoPeso, preventivoCosto);
         tabellaPreventivo.setItems(righePreventivo);
         tabellaPreventivo.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         tabellaPreventivo.setPlaceholder(new Label("Nessun calcolo ancora: usa il tab Ordini."));
+
+        vetriAltezza.setCellValueFactory(riga ->
+                new ReadOnlyStringWrapper(misura(riga.getValue().lunghezza())));
+        vetriLarghezza.setCellValueFactory(riga ->
+                new ReadOnlyStringWrapper(misura(riga.getValue().larghezza())));
+        vetriQuantita.setCellValueFactory(riga ->
+                new ReadOnlyStringWrapper(String.valueOf(riga.getValue().quantita())));
+        vetriAreaLastra.setCellValueFactory(riga ->
+                new ReadOnlyStringWrapper(mq(riga.getValue().areaMq())));
+        vetriAreaTotale.setCellValueFactory(riga ->
+                new ReadOnlyStringWrapper(mq(riga.getValue().areaTotaleMq())));
+        vetriCosto.setCellValueFactory(riga ->
+                new ReadOnlyStringWrapper(euro(riga.getValue().costo(prezzi()))));
+        allineaDestra(vetriAltezza, vetriLarghezza, vetriQuantita, vetriAreaLastra, vetriAreaTotale,
+                vetriCosto);
+        tabellaVetri.setItems(righeVetri);
+        tabellaVetri.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+        tabellaVetri.setPlaceholder(new Label("Nessuna quota vetro per queste tipologie."));
     }
 
     public void inizializza(Controller controller) {
@@ -182,15 +221,55 @@ public final class SchermataRisultati {
         preventivoLunghezza.setText("Nuovo" + simbolo);
         preventivoSfrido.setText("Sfrido" + simbolo);
         preventivoRecuperabile.setText("Da riusare" + simbolo);
+        vetriAltezza.setText("Altezza H" + simbolo);
+        vetriLarghezza.setText("Larghezza L" + simbolo);
         tabellaDistinta.refresh();
         alberoPiano.refresh();
         tabellaSfridi.refresh();
         tabellaPreventivo.refresh();
+        tabellaVetri.refresh();
+    }
+
+    /**
+     * L'utente ha cambiato il listino: i costi mostrati vanno rifatti. Il preventivo però porta
+     * dentro di sé i prezzi con cui è stato generato, quindi l'unico modo onesto di aggiornarlo è
+     * ricalcolarlo — qui ci limitiamo a dirlo, senza far finta che i vecchi numeri siano nuovi.
+     */
+    public void aggiornaPrezzi() {
+        if (!righePreventivo.isEmpty() || !righeVetri.isEmpty()) {
+            titolo.setText("Prezzi aggiornati: ricalcola per vedere i nuovi costi.");
+        }
     }
 
     /** Una misura del modello (mm) nell'unità scelta dall'utente. */
     private String misura(double mm) {
         return Etichette.misura(mm, controller.unita());
+    }
+
+    /**
+     * Un'area in metri quadri: il vetro si compra a mq qualunque sia l'unità scelta per le
+     * lunghezze, quindi questa colonna non segue l'impostazione.
+     */
+    private static String mq(double areaMq) {
+        return String.format("%.3f", areaMq);
+    }
+
+    /** Un importo in euro. */
+    private static String euro(double importo) {
+        return String.format("%.2f €", importo);
+    }
+
+    /** Un peso in chilogrammi (l'unità sta nell'intestazione di colonna). */
+    private static String kg(double chili) {
+        return String.format("%.2f", chili);
+    }
+
+    /**
+     * Il listino con cui valorizzare le celle: quello del preventivo mostrato, non quello corrente
+     * del controller — una tabella deve restare coerente con i totali sotto di lei.
+     */
+    private Prezzi prezzi() {
+        return preventivoMostrato == null ? controller.prezzi() : preventivoMostrato.prezzi();
     }
 
     /** Una misura col simbolo dell'unità: per i riepiloghi a testo libero. */
@@ -203,7 +282,9 @@ public final class SchermataRisultati {
     public void mostraDistinta(Distinta distinta) {
         righeDistinta.setAll(aggrega(distinta));
         riepilogoDistinta.setText(distinta.totalePezzi() + " pezzi da tagliare, "
-                + distinta.perMateriale().size() + " materiali.");
+                + distinta.perMateriale().size() + " materiali"
+                + (distinta.vetri().isEmpty() ? "." : "; " + distinta.totaleLastre() + " lastre di vetro ("
+                        + mq(distinta.areaVetroTotaleMq()) + " mq) nel tab Vetri."));
         schede.getSelectionModel().select(schedaDistinta);
     }
 
@@ -223,6 +304,9 @@ public final class SchermataRisultati {
     }
 
     public void mostraPreventivo(Preventivo preventivo) {
+        preventivoMostrato = preventivo;
+        mostraVetri(preventivo);
+        mostraCosti(preventivo);
         righePreventivo.setAll(preventivo.righe());
         totaliPreventivo.setText(preventivo.totaleBarreNuove() + " barre nuove da comprare ("
                 + conSimbolo(preventivo.lunghezzaNuovaTotale()) + "), "
@@ -235,16 +319,46 @@ public final class SchermataRisultati {
         schede.getSelectionModel().select(schedaPreventivo);
     }
 
-    /** L'anteprima di un solo ordine: riempie tutte le viste e apre il preventivo. */
-    public void mostraRisultato(Controller.Risultato risultato, String descrizione) {
-        mostraDistinta(risultato.distinta());
-        mostraPiano(risultato.piano());
-        mostraSfridi(risultato.piano());
-        mostraPreventivo(risultato.preventivo());
-        titolo.setText(descrizione);
+    /**
+     * Il conto dell'ordine: barre nuove + vetro. Se manca un prezzo lo dice, invece di mostrare uno
+     * zero che sembrerebbe un calcolo riuscito; peso a zero significa che i profili del catalogo non
+     * hanno ancora i kg/m di scheda, quindi le barre non si possono valorizzare.
+     */
+    private void mostraCosti(Preventivo preventivo) {
+        Prezzi prezzi = preventivo.prezzi();
+        if (!prezzi.impostati()) {
+            costiPreventivo.setText("Costi non calcolati: imposta i prezzi da File -> "
+                    + "Prezzi del materiale...");
+            return;
+        }
+        String avviso = prezzi.alChiloBarre() > 0 && preventivo.pesoTotale() == 0
+                ? "   (le barre pesano 0: i profili del catalogo non hanno ancora i kg/m)"
+                : "";
+        costiPreventivo.setText("Barre nuove " + euro(preventivo.costoBarre())
+                + " (" + kg(preventivo.pesoTotale()) + " kg)"
+                + "   +   vetro " + euro(preventivo.costoVetro())
+                + " (" + mq(preventivo.areaVetroTotaleMq()) + " mq)"
+                + "   =   TOTALE ORDINE " + euro(preventivo.costoTotale()) + avviso);
     }
 
-    /** Il calcolo globale: piano unico di tutti gli ordini, magazzino già aggiornato. */
+    /**
+     * Le lastre da ordinare, aggregate per misura. Non seleziona il suo tab: il vetro accompagna il
+     * preventivo, non lo sostituisce, e chi calcola si aspetta di trovarsi davanti quello.
+     */
+    private void mostraVetri(Preventivo preventivo) {
+        righeVetri.setAll(preventivo.righeVetro());
+        schedaVetri.setDisable(preventivo.righeVetro().isEmpty());
+        totaliVetri.setText(preventivo.righeVetro().isEmpty()
+                ? "Nessuna quota vetro per queste tipologie."
+                : preventivo.totaleLastre() + " lastre da ordinare, "
+                        + mq(preventivo.areaVetroTotaleMq()) + " mq di superficie in "
+                        + preventivo.righeVetro().size() + " misure diverse"
+                        + (preventivo.prezzi().alMqVetro() > 0
+                                ? ", per " + euro(preventivo.costoVetro()) + "."
+                                : "."));
+    }
+
+    /** Il calcolo globale: piano unico degli ordini evasi, magazzino già aggiornato. */
     public void mostraEvasione(EvasioneOrdini evasione) {
         mostraPiano(evasione.piano());
         mostraSfridi(evasione.piano());

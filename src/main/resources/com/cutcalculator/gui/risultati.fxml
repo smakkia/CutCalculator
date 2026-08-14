@@ -9,6 +9,7 @@
 <?import javafx.scene.control.TreeTableColumn?>
 <?import javafx.scene.control.TreeTableView?>
 <?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.VBox?>
 
 <!-- Tab Risultati: distinta, piano di taglio, sfridi e preventivo dell'ultimo calcolo. -->
 <BorderPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
@@ -98,11 +99,42 @@
                                         <TableColumn fx:id="preventivoSfrido" text="Sfrido (mm)" prefWidth="110.0"/>
                                         <TableColumn fx:id="preventivoRitagli" text="Ritagli" prefWidth="80.0"/>
                                         <TableColumn fx:id="preventivoRecuperabile" text="Da riusare (mm)" prefWidth="130.0"/>
+                                        <TableColumn fx:id="preventivoPeso" text="Peso (kg)" prefWidth="100.0"/>
+                                        <TableColumn fx:id="preventivoCosto" text="Costo" prefWidth="110.0"/>
                                     </columns>
                                 </TableView>
                             </center>
                             <bottom>
-                                <Label fx:id="totaliPreventivo" text="">
+                                <VBox spacing="4.0">
+                                    <padding>
+                                        <Insets top="8.0" right="12.0" bottom="10.0" left="12.0"/>
+                                    </padding>
+                                    <children>
+                                        <Label fx:id="totaliPreventivo" text=""/>
+                                        <Label fx:id="costiPreventivo" text="" style="-fx-font-weight: bold;"/>
+                                    </children>
+                                </VBox>
+                            </bottom>
+                        </BorderPane>
+                    </content>
+                </Tab>
+                <Tab fx:id="schedaVetri" text="Vetri">
+                    <content>
+                        <BorderPane>
+                            <center>
+                                <TableView fx:id="tabellaVetri">
+                                    <columns>
+                                        <TableColumn fx:id="vetriAltezza" text="Altezza H (mm)" prefWidth="180.0"/>
+                                        <TableColumn fx:id="vetriLarghezza" text="Larghezza L (mm)" prefWidth="180.0"/>
+                                        <TableColumn fx:id="vetriQuantita" text="Quantita'" prefWidth="110.0"/>
+                                        <TableColumn fx:id="vetriAreaLastra" text="Area lastra (mq)" prefWidth="160.0"/>
+                                        <TableColumn fx:id="vetriAreaTotale" text="Area totale (mq)" prefWidth="160.0"/>
+                                        <TableColumn fx:id="vetriCosto" text="Costo" prefWidth="120.0"/>
+                                    </columns>
+                                </TableView>
+                            </center>
+                            <bottom>
+                                <Label fx:id="totaliVetri" text="">
                                     <padding>
                                         <Insets top="8.0" right="12.0" bottom="10.0" left="12.0"/>
                                     </padding>
