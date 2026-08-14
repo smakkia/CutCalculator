@@ -2,9 +2,11 @@ package com.cutcalculator.formule;
 
 import com.cutcalculator.dominio.Ordine;
 import com.cutcalculator.dominio.Pezzo;
+import com.cutcalculator.dominio.Profilo;
 import com.cutcalculator.dominio.RegolaTaglio;
 import com.cutcalculator.dominio.RegolaVetro;
 import com.cutcalculator.dominio.Serramento;
+import com.cutcalculator.dominio.Varianti;
 import com.cutcalculator.dominio.Vetro;
 
 import java.util.ArrayList;
@@ -26,18 +28,22 @@ public class GeneratoreDistinta {
         List<Pezzo> pezzi = new ArrayList<>();
         List<Vetro> vetri = new ArrayList<>();
         for (Serramento serramento : ordine.serramenti()) {
+            Varianti varianti = serramento.varianti();
             for (RegolaTaglio regola : serramento.tipologia().regole()) {
-                double lunghezza = regola.lunghezza(serramento.dimensione());
+                // Le varianti sostituiscono il profilo e accorciano ciò che gli sta dentro: la
+                // ricetta resta quella, cambiano il codice da tagliare e la quota.
+                Profilo profilo = varianti.profiloDi(regola.profilo());
+                double lunghezza = regola.lunghezza(serramento.dimensione(), varianti);
                 int quantita = regola.quantita() * serramento.quantita();
                 for (int i = 0; i < quantita; i++) {
                     // Il listino viaggia col pezzo: due serramenti dello stesso profilo possono
                     // avere prezzi diversi (colori diversi), e il costo va calcolato con il suo.
-                    pezzi.add(new Pezzo(regola.profilo(), serramento.colore(), lunghezza,
+                    pezzi.add(new Pezzo(profilo, serramento.colore(), lunghezza,
                             regola.tipoTaglio(), regola.descrizione(), serramento.prezzi()));
                 }
             }
             for (RegolaVetro regola : serramento.tipologia().regoleVetro()) {
-                Vetro lastra = regola.calcola(serramento.dimensione());
+                Vetro lastra = regola.calcola(serramento.dimensione(), varianti);
                 vetri.add(new Vetro(lastra.lunghezza(), lastra.larghezza(),
                         lastra.quantita() * serramento.quantita(), serramento.prezzi()));
             }

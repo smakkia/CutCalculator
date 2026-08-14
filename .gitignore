@@ -39,3 +39,6 @@ cat */
 
 # Dati di runtime (magazzino persistito su disco)
 dati/
+
+# Test JUnit (scelta dell'utente: restano locali, fuori dal versionamento)
+src/test/

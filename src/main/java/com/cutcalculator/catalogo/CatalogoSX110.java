@@ -42,8 +42,10 @@ public final class CatalogoSX110 {
     private static final Profilo TELAIO_MONTANTE = new Profilo("SX11.136", "Telaio (montante)", Categoria.TELAIO, 1.63);
     private static final Profilo ANTA = new Profilo("SX11.203", "Anta", Categoria.ANTA, 1.681);
     private static final Profilo ANTA_206 = new Profilo("SX11.206", "Anta (SX11.206)", Categoria.ANTA, 1.781);
-    private static final Profilo ANTA_TRAVERSO = new Profilo("SX11.207", "Anta (traverso)", Categoria.ANTA, 1.679);
-    private static final Profilo ANTA_MONTANTE = new Profilo("SX11.208", "Anta (montante)", Categoria.ANTA, 1.529);
+    // Attenzione: la scheda di taglio usa .207 sul lato L e .208 sul lato H, cioe' al contrario di come
+    // il Gruppo B li chiama (.207 = montante/jamb, .208 = traverso/crosspiece). Qui vale il Gruppo B.
+    private static final Profilo ANTA_MONTANTE = new Profilo("SX11.207", "Anta (montante)", Categoria.ANTA, 1.679);
+    private static final Profilo ANTA_TRAVERSO = new Profilo("SX11.208", "Anta (traverso)", Categoria.ANTA, 1.529);
     private static final Profilo MONTANTE = new Profilo("SX11.301", "Incontro centrale", Categoria.MONTANTE, 0.495);
     private static final Profilo NODO = new Profilo("SX11.305", "Incontro centrale per fisso", Categoria.MONTANTE, 0.485);
     private static final Profilo INCONTRO_4ANTE =
@@ -182,7 +184,11 @@ public final class CatalogoSX110 {
     }
 
     // 2 ante alternativa: telaio SX11.101 L ×2 + SX11.136 H ×2 (45°);
-    // anta SX11.207 L/3+22 ×6 + SX11.208 H−78 ×6 (45°); incontro centrale SX11.301 H−78 ×4 (90°).
+    // anta SX11.208 (traverso) L/3+22 ×6 + SX11.207 (montante) H−78 ×6 (45°);
+    // incontro centrale SX11.301 H−78 ×4 (90°).
+    // NB: i due codici sono invertiti rispetto alla scheda di taglio, che assegna .207 al lato L e
+    // .208 al lato H; qui si segue il Gruppo B (.207 = montante, .208 = traverso). Da riverificare
+    // sulla scheda originale se questa tipologia verra' davvero inclusa.
     // Vetro: la scheda dell'anta SX11.207/.208 detrae meno, (Hₐ−120) × (Lₐ−89) = (H−198) × (L/3−67).
     // Quantità 3: nonostante il nome "2 ante", le ante sono quotate su L/3 (×6 traversi) come la 3 ante.
     private static Tipologia dueAnteAlternativa() {

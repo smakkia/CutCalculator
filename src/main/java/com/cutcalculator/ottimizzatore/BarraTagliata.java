@@ -24,6 +24,11 @@ import java.util.List;
  * Modello del kerf (spessore della lama): semplice, ogni pezzo "costa"
  * {@code lunghezza + kerf}, quindi {@code occupato = Σ lunghezze + n·kerf}. Anche il
  * primo pezzo paga un kerf, il che tiene conto di un po' di spuntatura ai bordi.
+ * <p>
+ * A questo si somma, per i profili che lo dichiarano, il <b>sovrapprezzo dei tagli in diagonale</b>
+ * ({@link Pezzo#extraKerf()}): un profilo maggiorato tagliato a 45° mangia più barra di uno piccolo.
+ * Non è più vero, quindi, che tutti i pezzi costano uguale a parità di lunghezza — il conto passa da
+ * {@code n · KERF} alla somma pezzo per pezzo.
  */
 public class BarraTagliata {
 
@@ -46,9 +51,17 @@ public class BarraTagliata {
         this.avanzo = avanzo;
     }
 
-    /** Spazio consumato: somma delle lunghezze più un kerf per ogni pezzo. */
+    /** Spazio consumato: somma delle lunghezze più il kerf (base + diagonali) di ogni pezzo. */
     public double occupato() {
-        return pezzi.stream().mapToDouble(Pezzo::lunghezza).sum() + pezzi.size() * KERF;
+        return pezzi.stream().mapToDouble(this::costoDi).sum();
+    }
+
+    /**
+     * Quanta barra costa un pezzo: la sua lunghezza, il kerf della lama e il sovrapprezzo dei tagli
+     * a 45°, che dipende dalla sezione del profilo (vedi {@link Pezzo#extraKerf()}).
+     */
+    private double costoDi(Pezzo pezzo) {
+        return pezzo.lunghezza() + KERF + pezzo.extraKerf();
     }
 
     /** Spazio ancora libero sulla barra (lo scarto se la si chiudesse così com'è). */
@@ -61,7 +74,7 @@ public class BarraTagliata {
      * quello giusto (l'ottimizzatore raggruppa i pezzi per profilo prima di riempire).
      */
     public boolean entra(Pezzo pezzo) {
-        return occupato() + pezzo.lunghezza() + KERF <= lunghezzaBarra + EPS;
+        return occupato() + costoDi(pezzo) <= lunghezzaBarra + EPS;
     }
 
     /**

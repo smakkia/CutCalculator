@@ -18,22 +18,37 @@ package com.cutcalculator.dominio;
  * Il {@code prezzoAlChilo} sta qui e non su {@link Materiale} per non toccare la chiave di
  * raggruppamento (profilo + colore) usata ovunque; se un domani il prezzo dovesse dipendere anche
  * dalla finitura, il posto giusto sarà un listino separato, non questo record.
+ * <p>
+ * L'{@code extraKerf45} è il terzo dato "fisico": una sezione più grande, tagliata in diagonale,
+ * mangia più barra di una piccola, perché la diagonale è più lunga del fronte. Quanto di più dipende
+ * dal <b>profilo</b> (sta qui), <i>quante volte</i> si paga dipende dal <b>pezzo</b> — cioè dal suo
+ * {@link TipoTaglio}, che sa quante estremità sono a 45°. Per i telai CX/RX vale
+ * {@code +24 mm} sul maggiorato e {@code +22 mm} sulla forma a Z, e i due si <b>sommano</b>
+ * (Z maggiorato = 46).
  *
  * @param codice        il codice del profilo (es. {@code RX70.101})
  * @param descrizione   il nome leggibile della scheda (es. "Telaio")
  * @param categoria     a cosa serve il profilo, per raggruppare i pezzi
  * @param pesoLineare   peso al metro in <b>kg/m</b>; 0 se non ancora trascritto dalla scheda
  * @param prezzoAlChilo prezzo del materiale in <b>€/kg</b>; 0 se non ancora impostato
+ * @param extraKerf45   millimetri di barra consumati <b>in più</b> a ogni estremità tagliata a 45°,
+ *                      rispetto al profilo base del sistema; 0 per il profilo base
  */
 public record Profilo(String codice, String descrizione, Categoria categoria,
-        double pesoLineare, double prezzoAlChilo) {
+        double pesoLineare, double prezzoAlChilo, double extraKerf45) {
 
     /** Millimetri in un metro: le lunghezze sono in mm, il peso lineare in kg/m. */
     private static final double MM_PER_METRO = 1000.0;
 
     /** Profilo senza dati di peso/prezzo: quelli dei cataloghi non ancora completati. */
     public Profilo(String codice, String descrizione, Categoria categoria) {
-        this(codice, descrizione, categoria, 0, 0);
+        this(codice, descrizione, categoria, 0, 0, 0);
+    }
+
+    /** Profilo con peso e prezzo, ma senza sovrapprezzo di taglio: la forma normale finora. */
+    public Profilo(String codice, String descrizione, Categoria categoria,
+            double pesoLineare, double prezzoAlChilo) {
+        this(codice, descrizione, categoria, pesoLineare, prezzoAlChilo, 0);
     }
 
     /**
@@ -43,7 +58,7 @@ public record Profilo(String codice, String descrizione, Categoria categoria,
      * a dare un prezzo particolare a un singolo profilo, quando serve.
      */
     public Profilo(String codice, String descrizione, Categoria categoria, double pesoLineare) {
-        this(codice, descrizione, categoria, pesoLineare, 0);
+        this(codice, descrizione, categoria, pesoLineare, 0, 0);
     }
 
     /** Peso (kg) di uno spezzone di questo profilo lungo {@code lunghezza} mm. */
@@ -58,6 +73,6 @@ public record Profilo(String codice, String descrizione, Categoria categoria,
 
     /** Copia di questo profilo con un altro prezzo al chilo (il listino cambia, l'anagrafica no). */
     public Profilo conPrezzoAlChilo(double prezzoAlChilo) {
-        return new Profilo(codice, descrizione, categoria, pesoLineare, prezzoAlChilo);
+        return new Profilo(codice, descrizione, categoria, pesoLineare, prezzoAlChilo, extraKerf45);
     }
 }

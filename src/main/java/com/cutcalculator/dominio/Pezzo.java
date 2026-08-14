@@ -36,6 +36,17 @@ public record Pezzo(Profilo profilo, Colore colore, double lunghezza,
         return new Materiale(profilo, colore);
     }
 
+    /**
+     * Millimetri di barra che questo pezzo consuma <b>oltre</b> alla sua lunghezza e al kerf base:
+     * il sovrapprezzo dei tagli in diagonale, {@code extraKerf45 del profilo × estremità a 45°}.
+     * <p>
+     * Vale 0 per i profili base e per qualunque pezzo tagliato 90/90, quindi finché il catalogo non
+     * dichiara profili maggiorati il conto della barra non cambia di un millimetro.
+     */
+    public double extraKerf() {
+        return profilo.extraKerf45() * tipoTaglio.tagliA45();
+    }
+
     /** Peso del pezzo (kg): lunghezza × peso lineare del profilo. */
     public double peso() {
         return profilo.peso(lunghezza);

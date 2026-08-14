@@ -79,6 +79,7 @@
                         <TableColumn fx:id="colonnaH" text="H (mm)" prefWidth="80.0"/>
                         <TableColumn fx:id="colonnaHF" text="HF (mm)" prefWidth="80.0"/>
                         <TableColumn fx:id="colonnaQuantita" text="Qta" prefWidth="60.0"/>
+                        <TableColumn fx:id="colonnaVarianti" text="Varianti" prefWidth="200.0"/>
                     </columns>
                 </TableView>
             </center>

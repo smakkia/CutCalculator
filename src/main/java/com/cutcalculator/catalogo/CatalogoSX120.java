@@ -54,7 +54,11 @@ public final class CatalogoSX120 {
     private static final Profilo ANTA_ANGOLO = new Profilo("SX12.205", "Anta (vetro infilare per angolo)", Categoria.ANTA, 0.987);
     private static final Profilo INCONTRO = new Profilo("SX12.301", "Incontro centrale", Categoria.MONTANTE, 1.204);
     private static final Profilo INCONTRO_4ANTE = new Profilo("SX12.303", "Incontro (per 4 ante)", Categoria.MONTANTE, 0.766);
-    private static final Profilo INCONTRO_ANGOLO = new Profilo("SX12.305", "Incontro angolo (assieme .304/.305/.306)", Categoria.MONTANTE, 1.385);
+    // L'angolo è un assieme di tre profili: la scheda li stampa in una riga sola (stessa quota, 1 pz),
+    // ma sono tre barre distinte da tagliare e da pesare.
+    private static final Profilo ANGOLO_INTERNO = new Profilo("SX12.304", "Incontro anta per angolo interno", Categoria.MONTANTE, 0.418);
+    private static final Profilo ANGOLO_PRINCIPALE = new Profilo("SX12.305", "Incontro angolo esterno (principale)", Categoria.MONTANTE, 1.385);
+    private static final Profilo ANGOLO_SECONDARIO = new Profilo("SX12.306", "Incontro angolo esterno (secondario)", Categoria.MONTANTE, 0.717);
 
     // --- Formule di comodo -------------------------------------------------------------
     private static Formula perL(double offset) {
@@ -261,7 +265,8 @@ public final class CatalogoSX120 {
     }
 
     // #7 - 4 ante con angolo: binario SX11.101 L−21 ×2 (poi a 45°); ante L/2−33 / L/2−69 + anta angolo
-    // SX12.205; nodo angolo SX12.304/305/306. Cut angolo reso 90/90 (ripresa a 45° manuale).
+    // SX12.205; nodo angolo = assieme SX12.304 + .305 + .306, tutti H−121 ×1 (la scheda li stampa in
+    // una riga sola). Cut angolo reso 90/90 (ripresa a 45° manuale).
     // Vetro: 4 × (H−141) × (L/2−111): qui L è il lato dell'angolo, non la luce totale.
     private static Tipologia quattroAnteConAngolo() {
         return new Tipologia("Finestra scorrevole a 4 ante con angolo", regole(
@@ -275,7 +280,9 @@ public final class CatalogoSX120 {
                         new RegolaTaglio("Anta ridotta (lato orizzontale)", ANTA_RIDOTTA, perMezzaL(69), 4, TAGLIO_45_45),
                         new RegolaTaglio("Anta ridotta (lato verticale)", ANTA_RIDOTTA, perH(99), 4, TAGLIO_45_45),
                         new RegolaTaglio("Incontro centrale", INCONTRO, perH(121), 4, TAGLIO_90_90),
-                        new RegolaTaglio("Incontro angolo", INCONTRO_ANGOLO, perH(121), 1, TAGLIO_90_90))),
+                        new RegolaTaglio("Incontro angolo (anta interna)", ANGOLO_INTERNO, perH(121), 1, TAGLIO_90_90),
+                        new RegolaTaglio("Incontro angolo (esterno principale)", ANGOLO_PRINCIPALE, perH(121), 1, TAGLIO_90_90),
+                        new RegolaTaglio("Incontro angolo (esterno secondario)", ANGOLO_SECONDARIO, perH(121), 1, TAGLIO_90_90))),
                 vetro(4, perH(141), perMezzaL(111)));
     }
 }

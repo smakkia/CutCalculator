@@ -51,6 +51,7 @@ public final class SchermataOrdini {
     @FXML private TableColumn<Serramento, String> colonnaH;
     @FXML private TableColumn<Serramento, String> colonnaHF;
     @FXML private TableColumn<Serramento, String> colonnaQuantita;
+    @FXML private TableColumn<Serramento, String> colonnaVarianti;
 
     private final ObservableList<Ordine> daCalcolare = FXCollections.observableArrayList();
     private final ObservableList<Ordine> calcolati = FXCollections.observableArrayList();
@@ -80,6 +81,9 @@ public final class SchermataOrdini {
                         : "-"));
         colonnaQuantita.setCellValueFactory(riga ->
                 new ReadOnlyStringWrapper(String.valueOf(riga.getValue().quantita())));
+        // Forma "breve": senza parentesi quadre, perché qui è una colonna sua.
+        colonnaVarianti.setCellValueFactory(riga ->
+                new ReadOnlyStringWrapper(Etichette.variantiBrevi(riga.getValue().varianti())));
         for (TableColumn<Serramento, String> colonna :
                 List.of(colonnaL, colonnaH, colonnaHF, colonnaQuantita)) {
             colonna.setStyle("-fx-alignment: CENTER-RIGHT;");

@@ -7,6 +7,7 @@ import com.cutcalculator.app.View;
 import com.cutcalculator.catalogo.Catalogo;
 import com.cutcalculator.catalogo.Sistema;
 import com.cutcalculator.dominio.Avanzo;
+import com.cutcalculator.dominio.Categoria;
 import com.cutcalculator.dominio.Colore;
 import com.cutcalculator.dominio.Dimensione;
 import com.cutcalculator.dominio.Materiale;
@@ -17,6 +18,8 @@ import com.cutcalculator.dominio.Profilo;
 import com.cutcalculator.dominio.Serramento;
 import com.cutcalculator.dominio.Tipologia;
 import com.cutcalculator.dominio.TipoTaglio;
+import com.cutcalculator.dominio.Variante;
+import com.cutcalculator.dominio.Varianti;
 import com.cutcalculator.dominio.Vetro;
 import com.cutcalculator.formule.Distinta;
 import com.cutcalculator.ottimizzatore.BarraTagliata;
@@ -368,6 +371,7 @@ public final class CliView implements View {
         Sistema sistema = scegliSistema();
         Tipologia tipologia = scegliDaLista(
                 "Tipologie di " + sistema.nome() + ":", sistema.tipologie(), Tipologia::nome);
+        Varianti varianti = scegliVarianti(sistema);
         Colore colore = leggiColore("Colore");
         double l = leggiMisura("Larghezza L");
         double h = leggiMisura("Altezza H");
@@ -379,10 +383,24 @@ public final class CliView implements View {
         double alKg = leggiPrezzo("Prezzo alluminio (EUR/kg)", proposti.alChiloBarre());
         double alMq = leggiPrezzo("Prezzo vetro (EUR/mq)", proposti.alMqVetro());
         controller.aggiungiSerramento(ordine, new Serramento(tipologia, colore,
-                new Dimensione(l, h, hf), quantita, new Prezzi(alKg, alMq)));
-        System.out.printf("  + %s / %s [%s]  %s x %s %s%s  x%d%n",
+                new Dimensione(l, h, hf), quantita, new Prezzi(alKg, alMq), varianti));
+        System.out.printf("  + %s / %s [%s]  %s x %s %s%s  x%d%s%n",
                 sistema.nome(), tipologia.nome(), colore.nome(), num(l), num(h), simbolo(),
-                hf > 0 ? " (HF " + mis(hf) + ")" : "", quantita);
+                hf > 0 ? " (HF " + mis(hf) + ")" : "", quantita, Etichette.varianti(varianti));
+    }
+
+    /**
+     * Chiede una variante per ogni ruolo che ne ha davvero piu' di una (telaio, anta...). I sistemi
+     * che non ne dichiarano non chiedono nulla, quindi per gli scorrevoli la procedura resta identica
+     * a prima. La prima voce di ogni elenco e' il profilo base della tipologia.
+     */
+    private Varianti scegliVarianti(Sistema sistema) {
+        Varianti scelte = Varianti.NESSUNA;
+        for (Categoria ruolo : sistema.ruoliConScelta()) {
+            scelte = scelte.con(scegliDaLista(Etichette.ruolo(ruolo) + ":",
+                    sistema.variantiDi(ruolo), Variante::nome));
+        }
+        return scelte;
     }
 
     /** I prezzi dell'ultimo serramento dell'ordine, o nessuno se e' il primo. */
@@ -635,9 +653,10 @@ public final class CliView implements View {
         int i = 1;
         for (Serramento s : ordine.serramenti()) {
             Dimensione d = s.dimensione();
-            System.out.printf(" %2d. %-32s %-10s %8s x %-8s %-2s   x%d%n",
+            System.out.printf(" %2d. %-32s %-10s %8s x %-8s %-2s   x%d%s%n",
                     i++, s.tipologia().nome(), s.colore().nome(),
-                    num(d.L()), num(d.H()), simbolo(), s.quantita());
+                    num(d.L()), num(d.H()), simbolo(), s.quantita(),
+                    Etichette.varianti(s.varianti()));
         }
     }
 

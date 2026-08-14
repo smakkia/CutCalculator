@@ -2,12 +2,15 @@ package com.cutcalculator.persistenza;
 
 import com.cutcalculator.catalogo.Catalogo;
 import com.cutcalculator.catalogo.Sistema;
+import com.cutcalculator.dominio.Categoria;
 import com.cutcalculator.dominio.Colore;
 import com.cutcalculator.dominio.Dimensione;
 import com.cutcalculator.dominio.Ordine;
 import com.cutcalculator.dominio.Prezzi;
 import com.cutcalculator.dominio.Serramento;
 import com.cutcalculator.dominio.Tipologia;
+import com.cutcalculator.dominio.Variante;
+import com.cutcalculator.dominio.Varianti;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -19,11 +22,18 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Archivio su disco degli ordini: carica e salva la lista di {@link Ordine} in un CSV semplice, una
  * riga per {@link Serramento} nel formato
- * {@code ordine;sistema;tipologia;colore;L;H;HF;quantita;calcolato;prezzoKg;prezzoMq}.
+ * {@code ordine;sistema;tipologia;colore;L;H;HF;quantita;calcolato;prezzoKg;prezzoMq;varianti}.
+ * <p>
+ * Le <b>varianti</b> stanno in un <b>campo solo</b>, {@code RUOLO=nome|RUOLO=nome} (vuoto = tutti i
+ * profili base): i ruoli con alternative aumenteranno, e un campo per ruolo avrebbe voluto dire
+ * cambiare il formato ogni volta. Anche qui si salva il <b>nome</b> e si ri-risolve dal catalogo; se
+ * il nome non c'è più, la riga è scartata invece che caricata coi profili base, perché un serramento
+ * con le quote sbagliate è peggio di un serramento mancante.
  * <p>
  * L'ultimo campo ({@code 1}/{@code 0}) dice se l'ordine è <b>già stato calcolato</b>: senza di lui,
  * ricaricando il file gli ordini evasi tornerebbero "da calcolare" e il calcolo globale scalerebbe
@@ -44,6 +54,9 @@ import java.util.Optional;
 public final class ArchivioOrdini {
 
     private static final String SEP = ";";
+    /** Dentro il campo varianti: separatore fra le scelte e fra ruolo e nome. */
+    private static final String VARIANTI = "|";
+    private static final String VALORE = "=";
     private static final char BOM = '﻿';
     /** 9° campo: l'ordine è già stato evaso da un calcolo globale. */
     private static final String CALCOLATO = "1";
@@ -108,7 +121,8 @@ public final class ArchivioOrdini {
                         Double.toString(d.HF()), Integer.toString(serramento.quantita()),
                         ordine.calcolato() ? CALCOLATO : DA_CALCOLARE,
                         Double.toString(serramento.prezzi().alChiloBarre()),
-                        Double.toString(serramento.prezzi().alMqVetro())));
+                        Double.toString(serramento.prezzi().alMqVetro()),
+                        scriviVarianti(serramento.varianti())));
             }
         }
         try {
@@ -137,7 +151,7 @@ public final class ArchivioOrdini {
             perNome.computeIfAbsent(nome, Ordine::new);   // ordine vuoto
             return;
         }
-        if (campi.length != 8 && campi.length != 9 && campi.length != 11) {
+        if (campi.length != 8 && campi.length != 9 && campi.length != 11 && campi.length != 12) {
             righeScartate++;
             return;
         }
@@ -157,8 +171,8 @@ public final class ArchivioOrdini {
 
     /** Ricostruisce un serramento dai campi; {@code null} se tipologia sconosciuta o dati invalidi. */
     private Serramento leggiSerramento(String[] campi) {
-        Optional<Tipologia> tipologia = catalogo.sistema(campi[1].trim())
-                .flatMap(sistema -> sistema.tipologia(campi[2].trim()));
+        Optional<Sistema> sistema = catalogo.sistema(campi[1].trim());
+        Optional<Tipologia> tipologia = sistema.flatMap(s -> s.tipologia(campi[2].trim()));
         if (tipologia.isEmpty() || campi[3].isBlank()) {
             return null;
         }
@@ -172,13 +186,56 @@ public final class ArchivioOrdini {
                 return null;
             }
             // I prezzi (campi 9-10) sono arrivati dopo: i file più vecchi non li hanno e valgono 0.
-            Prezzi prezzi = campi.length == 11
+            Prezzi prezzi = campi.length >= 11
                     ? new Prezzi(prezzo(campi[9]), prezzo(campi[10]))
                     : Prezzi.NESSUNO;
-            return new Serramento(tipologia.get(), colore, new Dimensione(l, h, hf), quantita, prezzi);
+            // Le varianti (campo 11) sono arrivate dopo ancora: senza il campo si usano i profili base.
+            Varianti varianti = campi.length == 12
+                    ? leggiVarianti(campi[11].trim(), sistema.get())
+                    : Varianti.NESSUNA;
+            if (varianti == null) {
+                return null;   // nome di variante non più nel catalogo: meglio scartare che sbagliare
+            }
+            return new Serramento(tipologia.get(), colore, new Dimensione(l, h, hf), quantita, prezzi,
+                    varianti);
         } catch (IllegalArgumentException malformata) {
             return null;
         }
+    }
+
+    /** {@code RUOLO=nome|RUOLO=nome}, vuoto se non c'è nessuna variante scelta. */
+    private static String scriviVarianti(Varianti varianti) {
+        return varianti.scelte().entrySet().stream()
+                .map(scelta -> scelta.getKey().name() + VALORE + scelta.getValue().nome())
+                .collect(Collectors.joining(VARIANTI));
+    }
+
+    /** L'inverso, ri-risolto contro il sistema; {@code null} se un nome non esiste più. */
+    private static Varianti leggiVarianti(String campo, Sistema sistema) {
+        if (campo.isEmpty()) {
+            return Varianti.NESSUNA;
+        }
+        Varianti varianti = Varianti.NESSUNA;
+        for (String scelta : campo.split("\\" + VARIANTI, -1)) {
+            String[] parti = scelta.split(VALORE, 2);
+            if (parti.length != 2) {
+                return null;
+            }
+            Categoria ruolo;
+            try {
+                ruolo = Categoria.valueOf(parti[0].trim());
+            } catch (IllegalArgumentException ruoloIgnoto) {
+                return null;
+            }
+            Optional<Variante> variante = sistema.variantiDi(ruolo).stream()
+                    .filter(v -> v.nome().equals(parti[1].trim()))
+                    .findFirst();
+            if (variante.isEmpty()) {
+                return null;
+            }
+            varianti = varianti.con(variante.get());
+        }
+        return varianti;
     }
 
     /** Un prezzo scritto nel file: malformato o negativo vale 0 (non impostato), non un errore. */

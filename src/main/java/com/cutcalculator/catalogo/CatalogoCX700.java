@@ -6,8 +6,10 @@ import com.cutcalculator.dominio.Profilo;
 import com.cutcalculator.dominio.RegolaTaglio;
 import com.cutcalculator.dominio.RegolaVetro;
 import com.cutcalculator.dominio.Tipologia;
+import com.cutcalculator.dominio.Variante;
 
 import java.util.List;
+import java.util.Map;
 
 import static com.cutcalculator.dominio.TipoTaglio.TAGLIO_45_45;
 import static com.cutcalculator.dominio.TipoTaglio.TAGLIO_90_90;
@@ -56,11 +58,31 @@ public final class CatalogoCX700 {
     }
 
     // --- Anagrafica profili (Gruppo B): 4° argomento = peso in kg/m, dalla voce "Peso kg/ml." ---
-    private static final Profilo TELAIO = new Profilo("CX70.101", "Telaio", Categoria.TELAIO, 1.287);
-    private static final Profilo ANTA = new Profilo("CX70.201", "Anta", Categoria.ANTA, 1.528);
+    private static final Profilo TELAIO = new Profilo("CX70.101", "Telaio ad L piccolo", Categoria.TELAIO, 1.287);
+    private static final Profilo ANTA = new Profilo("CX70.201", "Anta tonda piccola", Categoria.ANTA, 1.528);
     private static final Profilo MONTANTE = new Profilo("CX70.301", "Montante d'incontro", Categoria.MONTANTE, 1.471);
     private static final Profilo FERMAVETRO = new Profilo("CX70.566", "Fermavetro", Categoria.FERMAVETRO, 0.396);
-    private static final Profilo TRAVERSO_PORTA = new Profilo("CX70.402", "Traverso porta", Categoria.MONTANTE, 2.066);
+    private static final Profilo TRAVERSO_PORTA = new Profilo("CX70.402", "Traverso porta", Categoria.TRAVERSO, 2.066);
+
+    // --- Varianti (6° argomento del Profilo = extra kerf per estremità a 45°) -----------
+    // Il numero è la maggiore larghezza in vista della sezione: si paga come barra in più sulle
+    // diagonali e come restringimento di ciò che il profilo racchiude (3° argomento della Variante).
+    private static final Profilo TELAIO_L_MAGG = new Profilo("CX70.105", "Telaio ad L grande", Categoria.TELAIO, 1.681, 0, 24);
+    private static final Profilo TELAIO_Z = new Profilo("CX70.102", "Telaio a Z piccolo", Categoria.TELAIO, 1.366, 0, 22);
+    private static final Profilo TELAIO_Z_MAGG = new Profilo("CX70.106", "Telaio a Z grande", Categoria.TELAIO, 1.791, 0, 46);
+    private static final Profilo ANTA_MAGG = new Profilo("CX70.202", "Anta tonda grande", Categoria.ANTA, 1.956, 0, 24);
+
+    private static Map<Categoria, List<Variante>> varianti() {
+        return Map.of(
+                Categoria.TELAIO, List.of(
+                        new Variante("L piccolo", TELAIO),
+                        new Variante("L maggiorato", TELAIO_L_MAGG, 24),
+                        new Variante("Z piccolo", TELAIO_Z),
+                        new Variante("Z maggiorato", TELAIO_Z_MAGG, 24)),
+                Categoria.ANTA, List.of(
+                        new Variante("Piccola", ANTA),
+                        new Variante("Maggiorata", ANTA_MAGG, 24)));
+    }
 
     // --- Formule di comodo -------------------------------------------------------------
     private static Formula perL(double offset) {
@@ -93,7 +115,8 @@ public final class CatalogoCX700 {
                 portaUnaAnta(false),
                 portaUnaAnta(true),
                 portaDueAnte(false),
-                portaDueAnte(true)));
+                portaDueAnte(true)),
+                varianti());
     }
 
     // finestra 1 anta: telaio L,H ×2 (45°); anta CX70.201 L−44/H−44 ×2 (45°);
@@ -137,11 +160,13 @@ public final class CatalogoCX700 {
                 new RegolaTaglio("Anta (lato orizzontale)", ANTA, perL(44), 2, TAGLIO_45_45),
                 new RegolaTaglio("Anta (lato verticale)", ANTA, perH(44), 2, TAGLIO_45_45),
                 new RegolaTaglio("Fermavetro (lato orizzontale)", FERMAVETRO, perL(184), 4, TAGLIO_90_90),
-                new RegolaTaglio("Fermavetro (verticale, sopra traverso)", FERMAVETRO, hMenoHF(92), 2, TAGLIO_90_90),
-                new RegolaTaglio("Fermavetro (verticale, sotto traverso)", FERMAVETRO, perHF(188), 2, TAGLIO_90_90),
+                // Un'estremità sola sul perimetro: dall'altra parte c'è il traverso, che non ingrossa.
+                new RegolaTaglio("Fermavetro (verticale, sopra traverso)", FERMAVETRO, hMenoHF(92), 2, TAGLIO_90_90, 1),
+                new RegolaTaglio("Fermavetro (verticale, sotto traverso)", FERMAVETRO, perHF(188), 2, TAGLIO_90_90, 1),
                 new RegolaTaglio("Traverso porta", TRAVERSO_PORTA, perL(130), 1, TAGLIO_90_90)),
-                List.of(new RegolaVetro("Vetro (sopra traverso)", hMenoHF(58), perL(150), 1),
-                        new RegolaVetro("Vetro (sotto traverso)", perHF(154), perL(150), 1)));
+                // Idem per le lastre: in verticale un bordo va sul traverso, in orizzontale no.
+                List.of(new RegolaVetro("Vetro (sopra traverso)", hMenoHF(58), perL(150), 1, 1, 2),
+                        new RegolaVetro("Vetro (sotto traverso)", perHF(154), perL(150), 1, 1, 2)));
     }
 
     // porta 2 ante: anta CX70.201 L/2−24.5 ×4, H−44 ×4 (45°); fermavetro L/2−164.5 ×8, H−HF−92 ×4,
@@ -159,11 +184,11 @@ public final class CatalogoCX700 {
                 new RegolaTaglio("Anta (lato orizzontale)", ANTA, perMezzaL(24.5), 4, TAGLIO_45_45),
                 new RegolaTaglio("Anta (lato verticale)", ANTA, perH(44), 4, TAGLIO_45_45),
                 new RegolaTaglio("Fermavetro (lato orizzontale)", FERMAVETRO, perMezzaL(164.5), 8, TAGLIO_90_90),
-                new RegolaTaglio("Fermavetro (verticale, sopra traverso)", FERMAVETRO, hMenoHF(92), 4, TAGLIO_90_90),
-                new RegolaTaglio("Fermavetro (verticale, sotto traverso)", FERMAVETRO, perHF(188), 4, TAGLIO_90_90),
+                new RegolaTaglio("Fermavetro (verticale, sopra traverso)", FERMAVETRO, hMenoHF(92), 4, TAGLIO_90_90, 1),
+                new RegolaTaglio("Fermavetro (verticale, sotto traverso)", FERMAVETRO, perHF(188), 4, TAGLIO_90_90, 1),
                 new RegolaTaglio("Montante d'incontro", MONTANTE, perH(110), 1, TAGLIO_90_90),
                 new RegolaTaglio("Traverso porta", TRAVERSO_PORTA, perMezzaL(110.5), 2, TAGLIO_90_90)),
-                List.of(new RegolaVetro("Vetro (sopra traverso)", hMenoHF(58), perMezzaL(130), 1),
-                        new RegolaVetro("Vetro (sotto traverso)", perHF(154), perMezzaL(130), 1)));
+                List.of(new RegolaVetro("Vetro (sopra traverso)", hMenoHF(58), perMezzaL(130), 1, 1, 2),
+                        new RegolaVetro("Vetro (sotto traverso)", perHF(154), perMezzaL(130), 1, 1, 2)));
     }
 }
