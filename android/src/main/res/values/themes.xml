@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- I colori li mette Compose (Material 3): al tema XML basta togliere la ActionBar, che
+         altrimenti si sommerebbe alla TopAppBar disegnata da noi. -->
+    <style name="Theme.CutCalculator" parent="@android:style/Theme.Material.Light.NoActionBar" />
+</resources>
