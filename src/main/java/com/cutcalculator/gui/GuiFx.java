@@ -11,6 +11,7 @@ import com.cutcalculator.persistenza.ArchivioCalcoli;
 import com.cutcalculator.persistenza.ArchivioImpostazioni;
 import com.cutcalculator.persistenza.ArchivioMagazzino;
 import com.cutcalculator.persistenza.ArchivioOrdini;
+import com.cutcalculator.persistenza.ArchivioRipristino;
 import com.cutcalculator.pianificazione.EvasioneOrdini;
 import com.cutcalculator.preventivo.Preventivo;
 import javafx.application.Application;
@@ -53,7 +54,7 @@ public final class GuiFx extends Application implements View {
         ArchivioOrdini archivioOrdini = new ArchivioOrdini(FILE_ORDINI, catalogo);
         ArchivioImpostazioni impostazioni = new ArchivioImpostazioni(FILE_IMPOSTAZIONI);
         avvia(new Controller(catalogo, archivio, archivioOrdini, impostazioni,
-                new ArchivioCalcoli(CARTELLA_DATI)));
+                new ArchivioCalcoli(CARTELLA_DATI), new ArchivioRipristino(CARTELLA_DATI, catalogo)));
     }
 
     /**

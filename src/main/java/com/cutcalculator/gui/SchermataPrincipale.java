@@ -169,6 +169,14 @@ public final class SchermataPrincipale {
         schede.getSelectionModel().select(schedaMagazzino);
     }
 
+    /**
+     * Rinfresca la tabella del magazzino <b>restando dove si è</b>: serve a chi lo cambia da un altro
+     * tab (il ripristino di un ordine), dove saltare al magazzino sarebbe uno strappo.
+     */
+    public void mostraMagazzinoAggiornato() {
+        magazzinoController.aggiorna();
+    }
+
     public void mostraOrdine(Ordine ordine) {
         ordiniController.seleziona(ordine);
         schede.getSelectionModel().select(schedaOrdini);

@@ -370,19 +370,24 @@ public final class CliView implements View {
             System.out.println("  3) Rimuovi serramento");
             System.out.println("  4) Rinomina ordine");
             System.out.println("  5) Mostra il calcolo (distinta, preventivo, vetri, prezzo)");
+            System.out.println("  6) Ripristina (annulla il calcolo, torna da calcolare)");
             System.out.println("  0) Indietro");
-            switch (leggiIntero("Scelta", 0, 5)) {
+            switch (leggiIntero("Scelta", 0, 6)) {
                 case 1 -> aggiungiSerramento(ordine);
                 case 2 -> ordine(ordine);
                 case 3 -> rimuoviSerramento(ordine);
                 case 4 -> rinominaOrdine(ordine);
                 case 5 -> mostraCalcolo(ordine);
+                case 6 -> ripristinaOrdine(ordine);
                 case 0 -> resta = false;
             }
         }
     }
 
     private void aggiungiSerramento(Ordine ordine) {
+        if (!confermaModificaDiCalcolato(ordine)) {
+            return;
+        }
         Sistema sistema = scegliSistema();
         Tipologia tipologia = scegliDaLista(
                 "Tipologie di " + sistema.nome() + ":", sistema.tipologie(), Tipologia::nome);
@@ -418,6 +423,30 @@ public final class CliView implements View {
         return scelte;
     }
 
+    /**
+     * Avvisa prima di toccare i serramenti di un ordine <b>gia' calcolato</b>. Modificarlo lo rimette
+     * fra quelli da calcolare, ma il prossimo calcolo lo ritaglia <b>da capo</b>: il materiale gia'
+     * scalato viene contato una seconda volta, e il magazzino si allontana dalla realta' in silenzio.
+     * La via giusta e' il ripristino, che quel calcolo lo annulla davvero.
+     *
+     * @return {@code false} se l'utente ha preferito non modificare
+     */
+    private boolean confermaModificaDiCalcolato(Ordine ordine) {
+        if (!ordine.calcolato()) {
+            return true;
+        }
+        System.out.printf("%n  !! \"%s\" e' gia' stato calcolato: il suo materiale e' gia' stato"
+                + " scalato dal magazzino.%n", ordine.nome());
+        System.out.println("     Modificandolo tornera' tra quelli da calcolare, ma il prossimo"
+                + " calcolo lo ritagliera' DA CAPO,");
+        System.out.println("     contando una seconda volta il materiale gia' evaso.");
+        if (controller.ripristinabile(ordine)) {
+            System.out.println("     Meglio prima \"Ripristina\" (opzione 6): annulla quel calcolo e"
+                    + " rimette a posto il magazzino.");
+        }
+        return prompt("  Modificare comunque? [s/N]> ").trim().equalsIgnoreCase("s");
+    }
+
     /** I prezzi dell'ultimo serramento dell'ordine, o nessuno se e' il primo. */
     private static Prezzi prezziProposti(Ordine ordine) {
         List<Serramento> serramenti = ordine.serramenti();
@@ -429,6 +458,9 @@ public final class CliView implements View {
     private void rimuoviSerramento(Ordine ordine) {
         if (ordine.serramenti().isEmpty()) {
             System.out.println("  Ordine vuoto: niente da rimuovere.");
+            return;
+        }
+        if (!confermaModificaDiCalcolato(ordine)) {
             return;
         }
         ordine(ordine);
@@ -503,6 +535,38 @@ public final class CliView implements View {
 
         System.out.println("\n  " + "-".repeat(43));
         System.out.printf("  %-28s %14s%n", "PREZZO DELL'ORDINE", euro(calcolo.costoTotale()));
+    }
+
+    /**
+     * Annulla l'ultimo calcolo: il magazzino torna com'era prima e gli ordini di quel calcolo
+     * tornano da calcolare. Riguarda <b>tutto il gruppo</b>, perche' le barre erano condivise, e vale
+     * solo per il calcolo piu' recente.
+     */
+    private void ripristinaOrdine(Ordine ordine) {
+        if (!controller.ripristinabile(ordine)) {
+            List<String> ultimo = controller.ordiniRipristinabili();
+            System.out.println(ultimo.isEmpty()
+                    ? "  Niente da ripristinare: non c'e' nessun calcolo da annullare."
+                    : "  Non si puo' ripristinare \"" + ordine.nome() + "\": si annulla solo"
+                            + " l'ultimo calcolo, che riguardava " + String.join(", ", ultimo)
+                            + ". Degli altri non si sa piu' com'era il magazzino di partenza.");
+            return;
+        }
+        List<String> gruppo = controller.ordiniRipristinabili();
+        System.out.println("  Verranno rimessi tra gli ordini da calcolare:");
+        gruppo.forEach(nome -> System.out.println("    - " + nome));
+        System.out.println("  Il magazzino torna esattamente com'era prima di quel calcolo: gli"
+                + " avanzi usati tornano disponibili e i ritagli rientrati spariscono.");
+        System.out.println("  ATTENZIONE: si perdono le modifiche fatte a mano al magazzino dopo il"
+                + " calcolo, e i documenti (distinta, preventivo, vetri) di quegli ordini.");
+        if (!prompt("  Confermi? [s/N]> ").trim().equalsIgnoreCase("s")) {
+            System.out.println("  Annullato: niente e' cambiato.");
+            return;
+        }
+        List<String> tornati = controller.ripristina(ordine);
+        System.out.printf("  Ripristinati: %s.%n", String.join(", ", tornati));
+        System.out.printf("  Magazzino riportato a %s.%n",
+                conta(controller.totaleAvanzi(), "pezzo", "pezzi"));
     }
 
     // --- Scelte dal catalogo -----------------------------------------------------------

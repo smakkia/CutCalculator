@@ -14,6 +14,8 @@ import com.cutcalculator.persistenza.ArchivioImpostazioni;
 import com.cutcalculator.persistenza.CalcoloOrdine;
 import com.cutcalculator.persistenza.ArchivioMagazzino;
 import com.cutcalculator.persistenza.ArchivioOrdini;
+import com.cutcalculator.persistenza.ArchivioRipristino;
+import com.cutcalculator.persistenza.ArchivioRipristino.Ripristino;
 import com.cutcalculator.pianificazione.EvasioneOrdini;
 import com.cutcalculator.pianificazione.PianificatoreOrdini;
 import com.cutcalculator.preventivo.GeneratorePreventivo;
@@ -39,6 +41,7 @@ public final class Controller {
     private final ArchivioOrdini archivioOrdini;
     private final ArchivioImpostazioni archivioImpostazioni;
     private final ArchivioCalcoli archivioCalcoli;
+    private final ArchivioRipristino archivioRipristino;
     private final List<Avanzo> magazzino = new ArrayList<>();
     private final List<Ordine> ordini = new ArrayList<>();
     private Unita unita = Unita.PREDEFINITA;
@@ -75,11 +78,23 @@ public final class Controller {
      */
     public Controller(Catalogo catalogo, ArchivioMagazzino archivio, ArchivioOrdini archivioOrdini,
             ArchivioImpostazioni archivioImpostazioni, ArchivioCalcoli archivioCalcoli) {
+        this(catalogo, archivio, archivioOrdini, archivioImpostazioni, archivioCalcoli, null);
+    }
+
+    /**
+     * Come sopra, più l'{@link ArchivioRipristino}: prima di ogni calcolo globale viene messa da
+     * parte la fotografia del magazzino, così quel calcolo si può <b>annullare</b>
+     * ({@link #ripristina}). Senza questo archivio il ripristino non è disponibile.
+     */
+    public Controller(Catalogo catalogo, ArchivioMagazzino archivio, ArchivioOrdini archivioOrdini,
+            ArchivioImpostazioni archivioImpostazioni, ArchivioCalcoli archivioCalcoli,
+            ArchivioRipristino archivioRipristino) {
         this.catalogo = catalogo;
         this.archivio = archivio;
         this.archivioOrdini = archivioOrdini;
         this.archivioImpostazioni = archivioImpostazioni;
         this.archivioCalcoli = archivioCalcoli;
+        this.archivioRipristino = archivioRipristino;
         if (archivio != null) {
             magazzino.addAll(archivio.carica());
         }
@@ -399,6 +414,11 @@ public final class Controller {
         List<Ordine> daCalcolare = ordiniDaCalcolare();
         EvasioneOrdini evasione = new PianificatoreOrdini(strategia.crea())
                 .pianifica(daCalcolare, magazzino);
+        if (archivioRipristino != null) {
+            // La fotografia si prende PRIMA di toccare il magazzino: e' l'unico momento in cui
+            // esiste ancora lo stato a cui un eventuale ripristino dovra' tornare.
+            archivioRipristino.salva(daCalcolare.stream().map(Ordine::nome).toList(), magazzino());
+        }
         magazzino.clear();
         magazzino.addAll(evasione.magazzinoAggiornato());
         salva();
@@ -408,6 +428,70 @@ public final class Controller {
             archivioCalcoli.salva(evasione);   // distinta, preventivo e vetri di ogni ordine evaso
         }
         return evasione;
+    }
+
+    // --- Ripristino (annulla l'ultimo calcolo) -----------------------------------------
+
+    /**
+     * Gli ordini dell'<b>ultimo calcolo</b>, cioè quelli che un {@link #ripristina} rimetterebbe da
+     * calcolare; vuoto se non c'è niente da annullare. Le UI lo usano per abilitare il comando e per
+     * dire, nella conferma, chi altro verrà coinvolto.
+     */
+    public List<String> ordiniRipristinabili() {
+        return archivioRipristino == null
+                ? List.of()
+                : archivioRipristino.carica().map(Ripristino::ordini).orElse(List.of());
+    }
+
+    /** {@code true} se quest'ordine fa parte dell'ultimo calcolo e si può quindi ripristinare. */
+    public boolean ripristinabile(Ordine ordine) {
+        return ordiniRipristinabili().contains(ordine.nome());
+    }
+
+    /**
+     * <b>Annulla l'ultimo calcolo globale</b>: riporta il magazzino esattamente com'era prima
+     * (avanzi consumati restituiti, ritagli rientrati tolti), rimette <b>tutti</b> gli ordini di quel
+     * calcolo tra quelli da calcolare e ne butta via i documenti archiviati.
+     * <p>
+     * Il gruppo si ripristina <b>tutto insieme</b> perché il calcolo lo aveva unito in un piano solo,
+     * con le barre condivise: la parte di magazzino di un singolo ordine non esiste — esisterebbe solo
+     * una stima, e una stima qui vorrebbe dire lasciare per sempre il magazzino diverso dal vero.
+     * <p>
+     * Si può annullare <b>solo l'ultimo</b> calcolo: di quelli prima non si sa più da dove erano
+     * partiti, e riscrivere un magazzino vecchio cancellerebbe l'effetto dei calcoli successivi.
+     *
+     * @param ordine uno qualunque degli ordini di quel calcolo
+     * @return i nomi degli ordini tornati da calcolare (tutto il gruppo, quelli ancora esistenti)
+     * @throws IllegalStateException se quest'ordine non fa parte dell'ultimo calcolo
+     */
+    public List<String> ripristina(Ordine ordine) {
+        Ripristino ripristino = archivioRipristino == null
+                ? null
+                : archivioRipristino.carica().orElse(null);
+        if (ripristino == null || !ripristino.contiene(ordine.nome())) {
+            throw new IllegalStateException("\"" + ordine.nome() + "\" non fa parte dell'ultimo"
+                    + " calcolo: si puo' annullare solo quello, perche' degli altri non si sa piu'"
+                    + " com'era il magazzino di partenza");
+        }
+        magazzino.clear();
+        magazzino.addAll(ripristino.magazzino());
+        salva();
+
+        List<String> tornati = new ArrayList<>();
+        for (Ordine candidato : ordini) {
+            if (ripristino.contiene(candidato.nome())) {
+                candidato.segnaDaCalcolare();
+                tornati.add(candidato.nome());
+                if (archivioCalcoli != null) {
+                    // I documenti descrivevano un calcolo che non vale piu': tenerli sarebbe peggio
+                    // che non averli, perche' sembrerebbero ancora buoni.
+                    archivioCalcoli.dimentica(candidato.nome());
+                }
+            }
+        }
+        salvaOrdini();
+        archivioRipristino.cancella();   // annullato una volta, non si annulla due
+        return tornati;
     }
 
     /** I tre output della pipeline per un ordine. Vedi {@link #calcola}: non più usato dalle UI. */

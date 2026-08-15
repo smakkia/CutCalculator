@@ -42,6 +42,7 @@ public final class SchermataOrdini {
     @FXML private ListView<Ordine> elencoDaCalcolare;
     @FXML private ListView<Ordine> elencoCalcolati;
     @FXML private Button bottoneCalcola;
+    @FXML private Button bottoneRipristina;
     @FXML private Label riepilogo;
     @FXML private TableView<Serramento> tabellaSerramenti;
     @FXML private TableColumn<Serramento, String> colonnaSistema;
@@ -169,6 +170,9 @@ public final class SchermataOrdini {
 
     private void mostraSerramentiDi(Ordine ordine) {
         serramenti.setAll(ordine == null ? List.of() : ordine.serramenti());
+        // "Ripristina" ha senso solo sull'ultimo calcolo: degli altri non si sa piu' da dove
+        // partiva il magazzino, quindi il bottone resta spento invece di illudere.
+        bottoneRipristina.setDisable(ordine == null || !controller.ripristinabile(ordine));
     }
 
     /** L'ordine selezionato in uno dei due elenchi, o {@code null} se non ce n'è nessuno. */
@@ -259,9 +263,32 @@ public final class SchermataOrdini {
 
     // --- Azioni sui serramenti ---------------------------------------------------------
 
+    /**
+     * Avvisa prima di toccare i serramenti di un ordine <b>già calcolato</b>: modificarlo lo rimette
+     * fra quelli da calcolare, ma il prossimo calcolo lo ritaglia <b>da capo</b> e conta una seconda
+     * volta il materiale già scalato dal magazzino. La via pulita è il ripristino, che quel calcolo
+     * lo annulla davvero — se è ancora l'ultimo, il messaggio lo dice.
+     *
+     * @return {@code false} se l'utente ha preferito non modificare
+     */
+    private boolean confermaModificaDiCalcolato(Ordine ordine) {
+        if (!ordine.calcolato()) {
+            return true;
+        }
+        String consiglio = controller.ripristinabile(ordine)
+                ? "\n\nMeglio prima \"Ripristina ordine\": annulla quel calcolo e rimette a posto "
+                        + "il magazzino."
+                : "";
+        return Dialoghi.conferma("Ordine gia' calcolato",
+                "\"" + ordine.nome() + "\" e' gia' stato calcolato: il suo materiale e' gia' stato "
+                        + "scalato dal magazzino.\n\nModificandolo tornera' fra quelli da calcolare, "
+                        + "ma il prossimo calcolo lo ritagliera' da capo, contando una seconda volta "
+                        + "il materiale gia' evaso." + consiglio + "\n\nModificare comunque?");
+    }
+
     @FXML
     private void aggiungiSerramento() {
-        scelto().ifPresent(ordine -> DialogoSerramento
+        scelto().filter(this::confermaModificaDiCalcolato).ifPresent(ordine -> DialogoSerramento
                 .chiedi(controller.catalogo(), unita(), prezziProposti(ordine))
                 .ifPresent(serramento -> {
                     controller.aggiungiSerramento(ordine, serramento);
@@ -292,7 +319,7 @@ public final class SchermataOrdini {
             Dialoghi.errore("Nessun serramento scelto", "Seleziona la riga da rimuovere.");
             return;
         }
-        scelto().ifPresent(ordine -> {
+        scelto().filter(this::confermaModificaDiCalcolato).ifPresent(ordine -> {
             // Come in magazzino: si cerca l'oggetto, non l'indice di riga (l'ordinamento
             // per colonna scollerebbe i due indici).
             int indice = ordine.serramenti().indexOf(selezionato);
@@ -327,6 +354,45 @@ public final class SchermataOrdini {
                 return;
             }
             DialogoCalcolo.mostra(calcolo, ordine.nome(), ordine.calcolato(), unita());
+        });
+    }
+
+    /**
+     * Annulla l'ultimo calcolo: il magazzino torna esattamente com'era prima e gli ordini di quel
+     * calcolo tornano fra quelli da calcolare. Riguarda <b>tutto il gruppo</b> — le barre erano
+     * condivise, quindi la parte di magazzino di un ordine solo non esiste — e vale solo per il
+     * calcolo più recente.
+     */
+    @FXML
+    private void ripristinaOrdine() {
+        scelto().ifPresent(ordine -> {
+            if (!controller.ripristinabile(ordine)) {
+                List<String> ultimo = controller.ordiniRipristinabili();
+                Dialoghi.errore("Ripristino non disponibile", ultimo.isEmpty()
+                        ? "Non c'e' nessun calcolo da annullare."
+                        : "Si annulla solo l'ultimo calcolo, che riguardava: "
+                                + String.join(", ", ultimo) + ".\n\nDegli altri non si sa piu' "
+                                + "com'era il magazzino di partenza.");
+                return;
+            }
+            String gruppo = String.join(", ", controller.ordiniRipristinabili());
+            boolean conferma = Dialoghi.conferma("Ripristina ordine",
+                    "Tornano fra gli ordini da calcolare: " + gruppo + ".\n\n"
+                            + "Il magazzino torna esattamente com'era prima di quel calcolo: gli "
+                            + "avanzi usati tornano disponibili e i ritagli rientrati spariscono.\n\n"
+                            + "Si perdono le modifiche fatte a mano al magazzino dopo il calcolo, e "
+                            + "i documenti (distinta, preventivo, vetri) di quegli ordini. Procedo?");
+            if (!conferma) {
+                return;
+            }
+            List<String> tornati = controller.ripristina(ordine);
+            aggiorna();
+            seleziona(ordine);
+            principale.mostraMagazzinoAggiornato();
+            Dialoghi.informa("Ripristino eseguito",
+                    "Tornati da calcolare: " + String.join(", ", tornati)
+                            + ".\n\nMagazzino riportato a " + controller.totaleAvanzi()
+                            + " spezzoni.");
         });
     }
 

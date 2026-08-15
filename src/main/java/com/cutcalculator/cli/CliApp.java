@@ -7,6 +7,7 @@ import com.cutcalculator.persistenza.ArchivioCalcoli;
 import com.cutcalculator.persistenza.ArchivioImpostazioni;
 import com.cutcalculator.persistenza.ArchivioMagazzino;
 import com.cutcalculator.persistenza.ArchivioOrdini;
+import com.cutcalculator.persistenza.ArchivioRipristino;
 
 import java.nio.file.Path;
 import java.util.Scanner;
@@ -36,7 +37,9 @@ public final class CliApp {
         ArchivioOrdini archivioOrdini = new ArchivioOrdini(FILE_ORDINI, catalogo);
         ArchivioImpostazioni impostazioni = new ArchivioImpostazioni(FILE_IMPOSTAZIONI);
         ArchivioCalcoli calcoli = new ArchivioCalcoli(CARTELLA_DATI);
+        ArchivioRipristino ripristino = new ArchivioRipristino(CARTELLA_DATI, catalogo);
         View view = new CliView(new Scanner(System.in));
-        view.avvia(new Controller(catalogo, archivio, archivioOrdini, impostazioni, calcoli));
+        view.avvia(new Controller(catalogo, archivio, archivioOrdini, impostazioni, calcoli,
+                ripristino));
     }
 }
