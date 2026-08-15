@@ -147,7 +147,16 @@ public final class SchermataMagazzino {
         }
         // L'indice della riga nella tabella non serve: con l'ordinamento per colonna non
         // coinciderebbe piu' con quello nel magazzino, quindi si cerca l'avanzo scelto.
-        controller.rimuoviAvanzo(controller.magazzino().indexOf(selezionato), quantita);
+        int indice = controller.magazzino().indexOf(selezionato);
+        if (indice < 0) {
+            // La tabella mostrava un magazzino superato (p.es. dopo un calcolo che l'ha consumato):
+            // meglio rinfrescarla che passare un -1 al controller, che lancerebbe.
+            Dialoghi.errore("Riga non piu' valida",
+                    "Il pezzo non e' piu' a magazzino: la tabella e' stata aggiornata.");
+            aggiorna();
+            return;
+        }
+        controller.rimuoviAvanzo(indice, quantita);
         aggiorna();
     }
 

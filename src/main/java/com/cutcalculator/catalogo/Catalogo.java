@@ -2,6 +2,7 @@ package com.cutcalculator.catalogo;
 
 import com.cutcalculator.dominio.Tipologia;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -15,9 +16,23 @@ import java.util.stream.Collectors;
 public class Catalogo {
 
     private final List<Sistema> sistemi;
+    /**
+     * Indice tipologia → sistema, costruito una volta sola. Senza, {@link #sistemaDi} doveva
+     * scorrere i sistemi con un {@code contains}, cioè confrontare la {@link Tipologia} <b>regola
+     * per regola e formula per formula</b> con tutte quelle del catalogo — e lo si chiama per ogni
+     * serramento a ogni salvataggio automatico e per ogni cella della colonna Sistema.
+     */
+    private final Map<Tipologia, Sistema> sistemaPerTipologia;
 
     public Catalogo(List<Sistema> sistemi) {
         this.sistemi = List.copyOf(sistemi);
+        Map<Tipologia, Sistema> indice = new HashMap<>();
+        for (Sistema sistema : this.sistemi) {
+            // putIfAbsent: se due sistemi avessero la stessa identica ricetta vince il primo,
+            // esattamente come faceva il findFirst() di prima.
+            sistema.tipologie().forEach(tipologia -> indice.putIfAbsent(tipologia, sistema));
+        }
+        this.sistemaPerTipologia = Map.copyOf(indice);
     }
 
     /** Il catalogo completo con tutti i sistemi finora trascritti. */
@@ -50,6 +65,6 @@ public class Catalogo {
      * conosce il proprio sistema.
      */
     public Optional<Sistema> sistemaDi(Tipologia tipologia) {
-        return sistemi.stream().filter(s -> s.tipologie().contains(tipologia)).findFirst();
+        return Optional.ofNullable(sistemaPerTipologia.get(tipologia));
     }
 }

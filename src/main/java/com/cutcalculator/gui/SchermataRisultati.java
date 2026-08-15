@@ -118,7 +118,6 @@ public final class SchermataRisultati {
     private final ObservableList<CostoOrdine> righeQuoteVetri = FXCollections.observableArrayList();
 
     private Controller controller;
-    private Preventivo preventivoMostrato;
 
     /** Una riga della distinta: pezzi uguali (stesso materiale, lunghezza e taglio) contati insieme. */
     public record RigaDistinta(Materiale materiale, double lunghezza, TipoTaglio taglio, long quantita) {
@@ -306,14 +305,6 @@ public final class SchermataRisultati {
         return String.format("%.2f", chili);
     }
 
-    /**
-     * Il listino con cui valorizzare le celle: quello del preventivo mostrato, non quello corrente
-     * del controller — una tabella deve restare coerente con i totali sotto di lei.
-     */
-    private boolean valorizzato() {
-        return preventivoMostrato != null && preventivoMostrato.valorizzato();
-    }
-
     /** Una misura col simbolo dell'unità: per i riepiloghi a testo libero. */
     private String conSimbolo(double mm) {
         return Etichette.misuraConSimbolo(mm, controller.unita());
@@ -363,7 +354,8 @@ public final class SchermataRisultati {
         alberoPiano.setRoot(albero(piano));
         riepilogoPiano.setText(piano.numeroBarre() + " barre usate, di cui "
                 + piano.barreNuove() + " nuove; media geometrica dello sfrido "
-                + conSimbolo(piano.mediaGeometricaSfrido()) + ".");
+                + conSimbolo(piano.mediaGeometricaSfrido())
+                + ".  Algoritmo: " + controller.strategia().nome() + ".");
         schede.getSelectionModel().select(schedaPiano);
     }
 
@@ -375,7 +367,6 @@ public final class SchermataRisultati {
     }
 
     public void mostraPreventivo(Preventivo preventivo) {
-        preventivoMostrato = preventivo;
         mostraVetri(preventivo);
         mostraCosti(preventivo);
         righePreventivo.setAll(preventivo.righe());

@@ -62,6 +62,24 @@ public final class ArchivioCalcoli {
     }
 
     /**
+     * Cancella dai tre file i documenti di un ordine: lo si chiama quando l'ordine viene
+     * <b>rimosso o rinominato</b>.
+     * <p>
+     * Senza, le sue righe resterebbero lì per sempre — i file crescerebbero a ogni commessa chiusa,
+     * e soprattutto un <b>futuro ordine con lo stesso nome</b> si vedrebbe mostrare la distinta e il
+     * preventivo di quello vecchio, che con lui non c'entrano nulla. I file che non esistono ancora
+     * non vengono creati apposta per svuotarli.
+     */
+    public void dimentica(String ordine) {
+        for (String nomeFile : List.of("calcoli-distinta.csv", "calcoli-preventivo.csv",
+                "calcoli-vetri.csv")) {
+            if (Files.exists(cartella.resolve(nomeFile))) {
+                aggiorna(nomeFile, Set.of(ordine), List.of());
+            }
+        }
+    }
+
+    /**
      * Rilegge i documenti di un ordine calcolato. Se non è mai stato calcolato (o i file non ci
      * sono) torna un {@link CalcoloOrdine#vuoto() calcolo vuoto}, non un errore.
      */

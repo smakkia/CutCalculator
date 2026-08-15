@@ -7,8 +7,8 @@ import com.cutcalculator.dominio.Prezzi;
 import com.cutcalculator.dominio.Serramento;
 import com.cutcalculator.formule.Distinta;
 import com.cutcalculator.formule.GeneratoreDistinta;
-import com.cutcalculator.ottimizzatore.BestFitDecreasing;
 import com.cutcalculator.ottimizzatore.PianoDiTaglio;
+import com.cutcalculator.ottimizzatore.Strategia;
 import com.cutcalculator.persistenza.ArchivioCalcoli;
 import com.cutcalculator.persistenza.ArchivioImpostazioni;
 import com.cutcalculator.persistenza.CalcoloOrdine;
@@ -42,6 +42,7 @@ public final class Controller {
     private final List<Avanzo> magazzino = new ArrayList<>();
     private final List<Ordine> ordini = new ArrayList<>();
     private Unita unita = Unita.PREDEFINITA;
+    private Strategia strategia = Strategia.PREDEFINITA;
 
     /** Solo in memoria, senza persistenza: comodo per test o usi effimeri. */
     public Controller(Catalogo catalogo) {
@@ -87,6 +88,7 @@ public final class Controller {
         }
         if (archivioImpostazioni != null) {
             unita = archivioImpostazioni.caricaUnita();
+            strategia = archivioImpostazioni.caricaStrategia();
         }
     }
 
@@ -105,6 +107,22 @@ public final class Controller {
         this.unita = unita;
         if (archivioImpostazioni != null) {
             archivioImpostazioni.salvaUnita(unita);
+        }
+    }
+
+    /**
+     * L'euristica con cui il prossimo calcolo impacchetterà i pezzi nelle barre. Come l'unità è
+     * un'impostazione: vale da qui in avanti e non tocca i calcoli già fatti, che restano quelli.
+     */
+    public Strategia strategia() {
+        return strategia;
+    }
+
+    /** Cambia l'euristica di taglio e la persiste, se c'è un archivio impostazioni collegato. */
+    public void impostaStrategia(Strategia strategia) {
+        this.strategia = strategia;
+        if (archivioImpostazioni != null) {
+            archivioImpostazioni.salvaStrategia(strategia);
         }
     }
 
@@ -198,8 +216,11 @@ public final class Controller {
     /**
      * Crea un ordine con questo nome, lo aggiunge e lo restituisce (l'{@link Ordine} è modificabile).
      * Il colore si sceglie sul singolo {@link com.cutcalculator.dominio.Serramento}, non sull'ordine.
+     *
+     * @throws IllegalArgumentException se il nome è già di un altro ordine (vedi {@link #nomeLibero})
      */
     public Ordine nuovoOrdine(String nome) {
+        pretendiNomeLibero(nome, null);
         Ordine ordine = new Ordine(nome);
         ordini.add(ordine);
         salvaOrdini();
@@ -209,6 +230,40 @@ public final class Controller {
     public void rimuoviOrdine(Ordine ordine) {
         ordini.remove(ordine);
         salvaOrdini();
+        if (archivioCalcoli != null) {
+            archivioCalcoli.dimentica(ordine.nome());   // niente documenti orfani sul disco
+        }
+    }
+
+    /**
+     * {@code true} se nessun altro ordine si chiama già così. Il nome è la <b>chiave</b> con cui gli
+     * ordini vengono riletti da disco ({@code ArchivioOrdini} li raggruppa per nome): due omonimi si
+     * fonderebbero in uno solo al prossimo avvio, coi serramenti mescolati. Il vincolo sta qui e non
+     * nelle view perché è una regola della persistenza, non di come si chiede il nome.
+     *
+     * @param tranne l'ordine a cui il nome appartiene già (nel rinomina), oppure {@code null}
+     */
+    public boolean nomeLibero(String nome, Ordine tranne) {
+        return ordini.stream().noneMatch(o -> o != tranne && o.nome().equals(nome));
+    }
+
+    private void pretendiNomeLibero(String nome, Ordine tranne) {
+        if (!nomeLibero(nome, tranne)) {
+            throw new IllegalArgumentException("Esiste gia' un ordine chiamato \"" + nome + "\"");
+        }
+    }
+
+    /**
+     * Un nome libero da proporre per il prossimo ordine: {@code "Ordine N"} col primo N non ancora
+     * usato. Contare gli ordini non basta — dopo una rimozione il conteggio ripropone un nome
+     * occupato, ed è proprio così che nascevano gli omonimi.
+     */
+    public String nomeOrdineProposto() {
+        int n = ordini.size() + 1;
+        while (!nomeLibero("Ordine " + n, null)) {
+            n++;
+        }
+        return "Ordine " + n;
     }
 
     /**
@@ -236,10 +291,21 @@ public final class Controller {
         salvaOrdini();
     }
 
-    /** Rinomina l'ordine e persiste (il nome non cambia lo stato di calcolo). */
+    /**
+     * Rinomina l'ordine e persiste (il nome non cambia lo stato di calcolo). I documenti già
+     * calcolati sono archiviati <b>sotto il vecchio nome</b> e non seguono la rinomina: si
+     * dimenticano, invece di restare lì a farsi trovare da un futuro omonimo.
+     *
+     * @throws IllegalArgumentException se il nome è già di un altro ordine
+     */
     public void rinominaOrdine(Ordine ordine, String nome) {
+        pretendiNomeLibero(nome, ordine);
+        String precedente = ordine.nome();
         ordine.rinomina(nome);
         salvaOrdini();
+        if (archivioCalcoli != null && !precedente.equals(nome)) {
+            archivioCalcoli.dimentica(precedente);
+        }
     }
 
     /** {@code true} se c'è un archivio ordini collegato (salvataggio/caricamento disponibili). */
@@ -297,7 +363,7 @@ public final class Controller {
      */
     public Risultato calcola(Ordine ordine) {
         Distinta distinta = new GeneratoreDistinta().genera(ordine);
-        PianoDiTaglio piano = new BestFitDecreasing().ottimizza(distinta, magazzino);
+        PianoDiTaglio piano = strategia.crea().ottimizza(distinta, magazzino);
         Preventivo preventivo = new GeneratorePreventivo()
                 .genera(piano, distinta.vetri(), sogliaRitaglio());
         return new Risultato(distinta, piano, preventivo);
@@ -331,7 +397,8 @@ public final class Controller {
      */
     public EvasioneOrdini evadiOrdini() {
         List<Ordine> daCalcolare = ordiniDaCalcolare();
-        EvasioneOrdini evasione = new PianificatoreOrdini().pianifica(daCalcolare, magazzino);
+        EvasioneOrdini evasione = new PianificatoreOrdini(strategia.crea())
+                .pianifica(daCalcolare, magazzino);
         magazzino.clear();
         magazzino.addAll(evasione.magazzinoAggiornato());
         salva();

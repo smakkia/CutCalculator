@@ -6,7 +6,6 @@ import com.cutcalculator.dominio.Profilo;
 import com.cutcalculator.dominio.TipoTaglio;
 import com.cutcalculator.dominio.Varianti;
 
-import java.util.Locale;
 import java.util.stream.Collectors;
 
 /**
@@ -42,13 +41,6 @@ public final class Etichette {
     /** Come {@link #misura}, ma col simbolo dell'unità: {@code "6.5 m"}. */
     public static String misuraConSimbolo(double mm, Unita unita) {
         return unita.conSimbolo(mm);
-    }
-
-    /** Un conteggio o un numero puro (non una misura): niente conversione di unità. */
-    public static String numero(double valore) {
-        return Math.rint(valore) == valore
-                ? String.format(Locale.ROOT, "%.0f", valore)
-                : String.format(Locale.ROOT, "%.1f", valore);
     }
 
     /** Il nome di un ruolo come lo legge l'utente: {@code "Telaio"}, {@code "Montante d'incontro"}. */

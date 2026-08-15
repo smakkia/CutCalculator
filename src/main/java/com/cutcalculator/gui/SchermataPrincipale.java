@@ -7,6 +7,7 @@ import com.cutcalculator.catalogo.Sistema;
 import com.cutcalculator.dominio.Ordine;
 import com.cutcalculator.dominio.Tipologia;
 import com.cutcalculator.ottimizzatore.PianoDiTaglio;
+import com.cutcalculator.ottimizzatore.Strategia;
 import com.cutcalculator.pianificazione.DistintaOrdine;
 import com.cutcalculator.pianificazione.EvasioneOrdini;
 import com.cutcalculator.preventivo.Preventivo;
@@ -37,6 +38,7 @@ public final class SchermataPrincipale {
     @FXML private Tab schedaOrdini;
     @FXML private Tab schedaRisultati;
     @FXML private Menu menuUnita;
+    @FXML private Menu menuStrategia;
 
     // Iniettati da fx:include: <fx:id>Controller
     @FXML private SchermataMagazzino magazzinoController;
@@ -52,6 +54,7 @@ public final class SchermataPrincipale {
         ordiniController.inizializza(controller, this);
         risultatiController.inizializza(controller);
         costruisciMenuUnita();
+        costruisciMenuStrategia();
         schede.getSelectionModel().select(schedaMagazzino);   // tab d'apertura, esplicito
         avvisaRigheScartate();
     }
@@ -95,6 +98,33 @@ public final class SchermataPrincipale {
         magazzinoController.aggiornaUnita();
         ordiniController.aggiornaUnita();
         risultatiController.aggiornaUnita();
+    }
+
+    /**
+     * Il menu con cui si sceglie l'<b>euristica di taglio</b>: una voce per {@link Strategia}, con la
+     * corrente spuntata. Il predefinito è il multi-start, che prova più piani e tiene il migliore.
+     */
+    private void costruisciMenuStrategia() {
+        ToggleGroup gruppo = new ToggleGroup();
+        for (Strategia strategia : Strategia.values()) {
+            RadioMenuItem voce = new RadioMenuItem(strategia.nome());
+            voce.setToggleGroup(gruppo);
+            voce.setSelected(strategia == controller.strategia());
+            voce.setOnAction(evento -> cambiaStrategia(strategia));
+            menuStrategia.getItems().add(voce);
+        }
+    }
+
+    /**
+     * Cambia l'euristica. Le viste <b>non</b> si rinfrescano: un piano già calcolato resta quello che
+     * è: la scelta vale dal calcolo successivo, e riscrivere i numeri sotto gli occhi dell'utente
+     * gli farebbe credere che sia stato rifatto.
+     */
+    private void cambiaStrategia(Strategia strategia) {
+        controller.impostaStrategia(strategia);
+        Dialoghi.informa("Algoritmo di ottimizzazione",
+                strategia.nome() + "\n\n" + strategia.spiegazione()
+                        + "\n\nVale dal prossimo calcolo: i risultati gia' mostrati restano quelli.");
     }
 
     // --- Voci di menu ------------------------------------------------------------------

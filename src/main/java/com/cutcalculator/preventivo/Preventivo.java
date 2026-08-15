@@ -1,11 +1,8 @@
 package com.cutcalculator.preventivo;
 
-import com.cutcalculator.dominio.Colore;
 import com.cutcalculator.dominio.Prezzi;
-import com.cutcalculator.dominio.Profilo;
 
 import java.util.List;
-import java.util.Optional;
 
 /**
  * L'output della Fase 3: la stima del materiale necessario per un ordine — una
@@ -102,12 +99,5 @@ public record Preventivo(List<RigaProfilo> righe, List<RigaVetro> righeVetro) {
     /** Il costo del materiale dell'ordine: barre nuove + vetro. */
     public double costoTotale() {
         return costoBarre() + costoVetro();
-    }
-
-    /** La riga di un dato profilo in un dato colore, se presente nel preventivo. */
-    public Optional<RigaProfilo> rigaDi(Profilo profilo, Colore colore) {
-        return righe.stream()
-                .filter(riga -> riga.profilo().equals(profilo) && riga.colore().equals(colore))
-                .findFirst();
     }
 }

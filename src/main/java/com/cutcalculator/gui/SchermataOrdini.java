@@ -196,7 +196,7 @@ public final class SchermataOrdini {
 
     @FXML
     private void nuovoOrdine() {
-        chiediNome("Nuovo ordine", "Ordine " + (controller.ordini().size() + 1))
+        chiediNome("Nuovo ordine", controller.nomeOrdineProposto(), null)
                 .ifPresent(nome -> {
                     Ordine ordine = controller.nuovoOrdine(nome);
                     aggiorna();
@@ -206,7 +206,7 @@ public final class SchermataOrdini {
 
     @FXML
     private void rinominaOrdine() {
-        scelto().ifPresent(ordine -> chiediNome("Rinomina ordine", ordine.nome())
+        scelto().ifPresent(ordine -> chiediNome("Rinomina ordine", ordine.nome(), ordine)
                 .ifPresent(nome -> {
                     controller.rinominaOrdine(ordine, nome);
                     rinfrescaElenchi();
@@ -223,8 +223,14 @@ public final class SchermataOrdini {
         });
     }
 
-    /** Chiede un nome d'ordine valido: non vuoto e senza {@code ;} (separatore del CSV). */
-    private Optional<String> chiediNome(String titolo, String iniziale) {
+    /**
+     * Chiede un nome d'ordine valido: non vuoto, senza {@code ;} (separatore del CSV) e <b>non già
+     * usato</b> — gli ordini si rileggono da disco per nome, quindi due omonimi si fonderebbero in
+     * uno solo al prossimo avvio, coi serramenti mescolati.
+     *
+     * @param tranne l'ordine che quel nome ce l'ha già (nel rinomina), oppure {@code null}
+     */
+    private Optional<String> chiediNome(String titolo, String iniziale, Ordine tranne) {
         while (true) {
             TextInputDialog dialogo = new TextInputDialog(iniziale);
             dialogo.setTitle(titolo);
@@ -240,6 +246,11 @@ public final class SchermataOrdini {
             } else if (nome.contains(";")) {
                 Dialoghi.errore("Nome non valido",
                         "Il nome non puo' contenere ';' (e' il separatore del file).");
+            } else if (!controller.nomeLibero(nome, tranne)) {
+                Dialoghi.errore("Nome gia' usato",
+                        "C'e' gia' un ordine chiamato \"" + nome + "\".\n\nGli ordini si "
+                                + "ricaricano da disco per nome: due omonimi si fonderebbero in uno "
+                                + "solo al prossimo avvio.");
             } else {
                 return Optional.of(nome);
             }
@@ -284,7 +295,17 @@ public final class SchermataOrdini {
         scelto().ifPresent(ordine -> {
             // Come in magazzino: si cerca l'oggetto, non l'indice di riga (l'ordinamento
             // per colonna scollerebbe i due indici).
-            controller.rimuoviSerramento(ordine, ordine.serramenti().indexOf(selezionato));
+            int indice = ordine.serramenti().indexOf(selezionato);
+            if (indice < 0) {
+                // La tabella mostrava una versione superata dell'ordine: meglio rinfrescarla che
+                // passare un -1 al controller, che finirebbe in IndexOutOfBoundsException.
+                Dialoghi.errore("Riga non piu' valida",
+                        "Il serramento non fa piu' parte dell'ordine: la tabella e' stata aggiornata.");
+                aggiorna();
+                mostraSerramentiDi(ordine);
+                return;
+            }
+            controller.rimuoviSerramento(ordine, indice);
             aggiorna();            // l'ordine torna tra quelli da calcolare
             seleziona(ordine);
             mostraSerramentiDi(ordine);

@@ -9,6 +9,11 @@ import com.cutcalculator.dominio.Tipologia;
 
 import java.util.List;
 
+import static com.cutcalculator.catalogo.Formule.mezzaLpiu;
+import static com.cutcalculator.catalogo.Formule.perH;
+import static com.cutcalculator.catalogo.Formule.perL;
+import static com.cutcalculator.catalogo.Formule.perMezzaL;
+import static com.cutcalculator.catalogo.Formule.terzoLpiu;
 import static com.cutcalculator.dominio.TipoTaglio.TAGLIO_45_45;
 import static com.cutcalculator.dominio.TipoTaglio.TAGLIO_90_90;
 
@@ -50,29 +55,6 @@ public final class CatalogoSX110 {
     private static final Profilo NODO = new Profilo("SX11.305", "Incontro centrale per fisso", Categoria.MONTANTE, 0.485);
     private static final Profilo INCONTRO_4ANTE =
             new Profilo("SX11.303", "Incontro centrale (4 ante universale)", Categoria.MONTANTE, 0.485);
-
-    // --- Formule di comodo: lunghezza = base − offset ----------------------------------
-    private static Formula perL(double offset) {
-        return new Formula(1, 0, 0, -offset);
-    }
-
-    private static Formula perMezzaL(double offset) {
-        return new Formula(0.5, 0, 0, -offset);
-    }
-
-    /** L/2 + add (offset positivo). */
-    private static Formula mezzaLpiu(double add) {
-        return new Formula(0.5, 0, 0, add);
-    }
-
-    /** L/3 + add. */
-    private static Formula terzoLpiu(double add) {
-        return new Formula(1.0 / 3.0, 0, 0, add);
-    }
-
-    private static Formula perH(double offset) {
-        return new Formula(0, 1, 0, -offset);
-    }
 
     /**
      * Altezza dell'anta: {@code Hₐ = H − 78}, uguale in tutte le tipologie. La larghezza dell'anta

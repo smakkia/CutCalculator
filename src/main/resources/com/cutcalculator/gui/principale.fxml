@@ -21,9 +21,11 @@
             <menus>
                 <Menu text="Impostazioni">
                     <items>
-                        <!-- Le voci mm/cm/m le aggiunge SchermataPrincipale: una per ogni Unita.
-                             I prezzi non stanno qui: si dichiarano su ogni serramento. -->
+                        <!-- Le voci le aggiunge SchermataPrincipale: una per ogni Unita e una per
+                             ogni Strategia. I prezzi non stanno qui: si dichiarano su ogni
+                             serramento. -->
                         <Menu fx:id="menuUnita" text="Unita' di misura"/>
+                        <Menu fx:id="menuStrategia" text="Algoritmo di ottimizzazione"/>
                         <SeparatorMenuItem/>
                         <MenuItem text="Esci" onAction="#esci"/>
                     </items>

@@ -1,6 +1,7 @@
 package com.cutcalculator.persistenza;
 
 import com.cutcalculator.app.Unita;
+import com.cutcalculator.ottimizzatore.Strategia;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -11,8 +12,9 @@ import java.nio.file.Path;
 import java.util.Properties;
 
 /**
- * Archivio su disco delle preferenze dell'utente — oggi la sola {@link Unita unità di misura} con cui
- * mostrare e leggere le lunghezze; domani anche soglia di ritaglio e barra standard. I <b>prezzi</b>
+ * Archivio su disco delle preferenze dell'utente — l'{@link Unita unità di misura} con cui mostrare e
+ * leggere le lunghezze e la {@link Strategia euristica di taglio} da usare nei calcoli; domani anche
+ * soglia di ritaglio e barra standard. I <b>prezzi</b>
  * qui non ci sono: non sono una preferenza, si dichiarano su ogni serramento.
  * <p>
  * Formato {@code properties} (una riga {@code chiave=valore}), UTF-8: leggibile e correggibile a
@@ -25,6 +27,7 @@ import java.util.Properties;
 public final class ArchivioImpostazioni {
 
     private static final String CHIAVE_UNITA = "unita";
+    private static final String CHIAVE_STRATEGIA = "strategia";
 
     private final Path file;
 
@@ -39,8 +42,23 @@ public final class ArchivioImpostazioni {
 
     /** Salva l'unità scelta, creando le cartelle mancanti. */
     public void salvaUnita(Unita unita) {
+        salvaChiave(CHIAVE_UNITA, unita.name());
+    }
+
+    /** L'euristica di taglio salvata, o la {@link Strategia#PREDEFINITA} se non c'è o non si capisce. */
+    public Strategia caricaStrategia() {
+        return Strategia.daNome(leggi().getProperty(CHIAVE_STRATEGIA));
+    }
+
+    /** Salva l'euristica scelta. */
+    public void salvaStrategia(Strategia strategia) {
+        salvaChiave(CHIAVE_STRATEGIA, strategia.name());
+    }
+
+    /** Scrive una preferenza <b>preservando le altre</b>: sono indipendenti fra loro. */
+    private void salvaChiave(String chiave, String valore) {
         Properties impostazioni = leggi();
-        impostazioni.setProperty(CHIAVE_UNITA, unita.name());
+        impostazioni.setProperty(chiave, valore);
         scrivi(impostazioni);
     }
 

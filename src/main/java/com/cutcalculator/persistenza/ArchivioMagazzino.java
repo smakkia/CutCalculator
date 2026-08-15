@@ -83,7 +83,9 @@ public final class ArchivioMagazzino {
         if (pulita.isEmpty() || pulita.startsWith("#")) {
             return null;
         }
-        String[] campi = pulita.split(SEP);
+        // Limite -1 come negli altri archivi: senza, un campo finale vuoto sparirebbe e la riga
+        // sembrerebbe averne tre (cioe' una vecchia riga senza colore) invece che una malformata.
+        String[] campi = pulita.split(SEP, -1);
         if (campi.length != 4) {
             return null;
         }
@@ -105,14 +107,22 @@ public final class ArchivioMagazzino {
         return !riga.isEmpty() && riga.charAt(0) == BOM ? riga.substring(1) : riga;
     }
 
-    /** Mappa codice → profilo con tutti i profili distinti del catalogo (primo che vince). */
+    /**
+     * Mappa codice → profilo con tutti i profili distinti del catalogo (primo che vince).
+     * <p>
+     * Si passa da {@link Sistema#profili()}, che è la <b>stessa</b> lista da cui le UI fanno
+     * scegliere il profilo di un avanzo: comprende quindi anche i profili delle <b>varianti</b>
+     * (telaio maggiorato, anta maggiorata), che non compaiono in nessuna {@link RegolaTaglio}.
+     * Indicizzando le sole regole, un avanzo di telaio maggiorato si poteva dichiarare e salvare ma
+     * non si sarebbe più ricaricato: la riga veniva scartata in silenzio e il primo salvataggio
+     * successivo la cancellava.
+     */
     private static Map<String, Profilo> indicizzaProfili(Catalogo catalogo) {
         Map<String, Profilo> perCodice = new LinkedHashMap<>();
         for (Sistema sistema : catalogo.sistemi()) {
-            sistema.tipologie().stream()
-                    .flatMap(t -> t.regole().stream())
-                    .map(RegolaTaglio::profilo)
-                    .forEach(p -> perCodice.putIfAbsent(p.codice(), p));
+            for (Profilo profilo : sistema.profili()) {
+                perCodice.putIfAbsent(profilo.codice(), profilo);
+            }
         }
         return perCodice;
     }

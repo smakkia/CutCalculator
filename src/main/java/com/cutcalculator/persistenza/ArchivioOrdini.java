@@ -57,7 +57,9 @@ public final class ArchivioOrdini {
     /** Dentro il campo varianti: separatore fra le scelte e fra ruolo e nome. */
     private static final String VARIANTI = "|";
     private static final String VALORE = "=";
-    private static final char BOM = '﻿';
+    /** Il BOM scritto come escape, non come carattere letterale: un salvataggio in un altro
+     * encoding lo trasformerebbe in silenzio in un carattere qualunque. */
+    private static final char BOM = '\uFEFF';
     /** 9° campo: l'ordine è già stato evaso da un calcolo globale. */
     private static final String CALCOLATO = "1";
     private static final String DA_CALCOLARE = "0";

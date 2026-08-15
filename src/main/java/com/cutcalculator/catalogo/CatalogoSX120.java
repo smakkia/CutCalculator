@@ -10,6 +10,14 @@ import com.cutcalculator.dominio.Tipologia;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.cutcalculator.catalogo.Formule.mezzaLpiu;
+import static com.cutcalculator.catalogo.Formule.perH;
+import static com.cutcalculator.catalogo.Formule.perL;
+import static com.cutcalculator.catalogo.Formule.perMezzaL;
+import static com.cutcalculator.catalogo.Formule.quartoL;
+import static com.cutcalculator.catalogo.Formule.quartoLpiu;
+import static com.cutcalculator.catalogo.Formule.terzoL;
+import static com.cutcalculator.catalogo.Formule.terzoLpiu;
 import static com.cutcalculator.dominio.TipoTaglio.TAGLIO_45_45;
 import static com.cutcalculator.dominio.TipoTaglio.TAGLIO_90_45_DX;
 import static com.cutcalculator.dominio.TipoTaglio.TAGLIO_90_45_SX;
@@ -59,44 +67,6 @@ public final class CatalogoSX120 {
     private static final Profilo ANGOLO_INTERNO = new Profilo("SX12.304", "Incontro anta per angolo interno", Categoria.MONTANTE, 0.418);
     private static final Profilo ANGOLO_PRINCIPALE = new Profilo("SX12.305", "Incontro angolo esterno (principale)", Categoria.MONTANTE, 1.385);
     private static final Profilo ANGOLO_SECONDARIO = new Profilo("SX12.306", "Incontro angolo esterno (secondario)", Categoria.MONTANTE, 0.717);
-
-    // --- Formule di comodo -------------------------------------------------------------
-    private static Formula perL(double offset) {
-        return new Formula(1, 0, 0, -offset);
-    }
-
-    private static Formula perMezzaL(double offset) {
-        return new Formula(0.5, 0, 0, -offset);
-    }
-
-    /** L/2 + add. */
-    private static Formula mezzaLpiu(double add) {
-        return new Formula(0.5, 0, 0, add);
-    }
-
-    /** L/3 − offset. */
-    private static Formula terzoL(double offset) {
-        return new Formula(1.0 / 3.0, 0, 0, -offset);
-    }
-
-    /** L/3 + add. */
-    private static Formula terzoLpiu(double add) {
-        return new Formula(1.0 / 3.0, 0, 0, add);
-    }
-
-    /** L/4 − offset. */
-    private static Formula quartoL(double offset) {
-        return new Formula(0.25, 0, 0, -offset);
-    }
-
-    /** L/4 + add. */
-    private static Formula quartoLpiu(double add) {
-        return new Formula(0.25, 0, 0, add);
-    }
-
-    private static Formula perH(double offset) {
-        return new Formula(0, 1, 0, -offset);
-    }
 
     /** Il telaio esterno (2 montanti 90/45 + 1 traverso 45/45) del profilo dato. */
     private static List<RegolaTaglio> telaioEsterno(Profilo p) {

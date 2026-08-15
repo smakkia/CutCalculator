@@ -37,11 +37,6 @@ public record Prezzi(double alChiloBarre, double alMqVetro) {
         return profilo.prezzoAlChilo() > 0 ? profilo.prezzoAlChilo() : alChiloBarre;
     }
 
-    /** Il costo (€) di {@code kg} chilogrammi di un dato profilo. */
-    public double costoBarre(Profilo profilo, double kg) {
-        return kg * alChiloDi(profilo);
-    }
-
     /** Il costo (€) di {@code mq} metri quadri di vetro. */
     public double costoVetro(double mq) {
         return mq * alMqVetro;

@@ -38,11 +38,6 @@ public record PianoDiTaglio(List<BarraTagliata> barre) {
         return (int) barre.stream().filter(b -> !b.avanzo()).count();
     }
 
-    /** Lo sfrido residuo di ogni barra, nell'ordine delle barre. */
-    public List<Double> sfridi() {
-        return barre.stream().map(BarraTagliata::sfrido).toList();
-    }
-
     /**
      * Media geometrica degli sfridi per barra — la metrica di qualità del piano:
      * a parità di condizioni, il piano con media più bassa spreca meno ed è quello scelto.
@@ -66,14 +61,4 @@ public record PianoDiTaglio(List<BarraTagliata> barre) {
                 BarraTagliata::materiale, LinkedHashMap::new, Collectors.toList()));
     }
 
-    /** Numero di barre nuove per {@link Materiale}: la riga base del preventivo. */
-    public Map<Materiale, Integer> barreNuovePerMateriale() {
-        Map<Materiale, Integer> conteggio = new LinkedHashMap<>();
-        for (BarraTagliata barra : barre) {
-            if (!barra.avanzo()) {
-                conteggio.merge(barra.materiale(), 1, Integer::sum);
-            }
-        }
-        return conteggio;
-    }
 }

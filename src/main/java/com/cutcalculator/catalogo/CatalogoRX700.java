@@ -1,7 +1,6 @@
 package com.cutcalculator.catalogo;
 
 import com.cutcalculator.dominio.Categoria;
-import com.cutcalculator.dominio.Formula;
 import com.cutcalculator.dominio.Profilo;
 import com.cutcalculator.dominio.RegolaTaglio;
 import com.cutcalculator.dominio.RegolaVetro;
@@ -11,6 +10,11 @@ import com.cutcalculator.dominio.Variante;
 import java.util.List;
 import java.util.Map;
 
+import static com.cutcalculator.catalogo.Formule.hMenoHF;
+import static com.cutcalculator.catalogo.Formule.perH;
+import static com.cutcalculator.catalogo.Formule.perHF;
+import static com.cutcalculator.catalogo.Formule.perL;
+import static com.cutcalculator.catalogo.Formule.perMezzaL;
 import static com.cutcalculator.dominio.TipoTaglio.TAGLIO_45_45;
 import static com.cutcalculator.dominio.TipoTaglio.TAGLIO_90_90;
 
@@ -83,29 +87,6 @@ public final class CatalogoRX700 {
                 Categoria.ANTA, List.of(
                         new Variante("Piccola", ANTA),
                         new Variante("Maggiorata", ANTA_MAGG, 24)));
-    }
-
-    // --- Formule di comodo -------------------------------------------------------------
-    private static Formula perL(double offset) {
-        return new Formula(1, 0, 0, -offset);
-    }
-
-    private static Formula perMezzaL(double offset) {
-        return new Formula(0.5, 0, 0, -offset);
-    }
-
-    private static Formula perH(double offset) {
-        return new Formula(0, 1, 0, -offset);
-    }
-
-    /** H − HF − offset (montante del vetro sopra il traverso della porta). */
-    private static Formula hMenoHF(double offset) {
-        return new Formula(0, 1, -1, -offset);
-    }
-
-    /** HF − offset (montante del vetro sotto il traverso della porta). */
-    private static Formula perHF(double offset) {
-        return new Formula(0, 0, 1, -offset);
     }
 
     /** Il sistema RX 700 con le sue tipologie. */

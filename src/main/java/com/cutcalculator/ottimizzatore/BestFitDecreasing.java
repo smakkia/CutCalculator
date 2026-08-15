@@ -10,8 +10,10 @@ import java.util.List;
  * aperta che resta <b>più piena</b> (sfrido residuo minimo) fra quelle in cui entra;
  * se non entra da nessuna parte, una barra nuova.
  * <p>
- * È la strategia di riferimento: incastra i pezzi più stretti di FFD e, dato che gli
- * avanzi hanno sfrido piccolo, tende naturalmente a riusarli per primi.
+ * È la <b>base di partenza</b> di tutte le altre: incastra i pezzi più stretti di FFD e, dato che gli
+ * avanzi hanno sfrido piccolo, tende naturalmente a riusarli per primi. {@link MultiStartCasuale} —
+ * l'euristica predefinita — parte proprio dal suo piano e lo sostituisce solo se un ordine casuale
+ * fa meglio, quindi questa resta il pavimento sotto cui non si scende.
  */
 public class BestFitDecreasing implements Ottimizzatore {
 

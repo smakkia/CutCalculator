@@ -11,9 +11,9 @@ import com.cutcalculator.dominio.Vetro;
 import com.cutcalculator.formule.Distinta;
 import com.cutcalculator.formule.GeneratoreDistinta;
 import com.cutcalculator.ottimizzatore.BarraTagliata;
-import com.cutcalculator.ottimizzatore.BestFitDecreasing;
 import com.cutcalculator.ottimizzatore.Ottimizzatore;
 import com.cutcalculator.ottimizzatore.PianoDiTaglio;
+import com.cutcalculator.ottimizzatore.Strategia;
 import com.cutcalculator.preventivo.GeneratorePreventivo;
 import com.cutcalculator.preventivo.Preventivo;
 import com.cutcalculator.preventivo.RigaProfilo;
@@ -45,8 +45,21 @@ public final class PianificatoreOrdini {
     public static final double SOGLIA_RITAGLIO_DEFAULT = Avanzo.LUNGHEZZA_MINIMA_RIUSO;
 
     private final GeneratoreDistinta generatoreDistinta = new GeneratoreDistinta();
-    private final Ottimizzatore ottimizzatore = new BestFitDecreasing();
+    private final Ottimizzatore ottimizzatore;
     private final GeneratorePreventivo generatorePreventivo = new GeneratorePreventivo();
+
+    /** Con l'euristica {@link Strategia#PREDEFINITA predefinita}. */
+    public PianificatoreOrdini() {
+        this(Strategia.PREDEFINITA.crea());
+    }
+
+    /**
+     * Con l'euristica scelta dall'utente. Il pianificatore non sa quale sia: gli basta che sappia
+     * impacchettare, e il resto del calcolo (distinta, preventivo, quote, ricircolo) non cambia.
+     */
+    public PianificatoreOrdini(Ottimizzatore ottimizzatore) {
+        this.ottimizzatore = ottimizzatore;
+    }
 
     /** Come {@link #pianifica(List, List, double, double)} con soglia e barra standard di default. */
     public EvasioneOrdini pianifica(List<Ordine> ordini, List<Avanzo> magazzino) {
@@ -184,10 +197,20 @@ public final class PianificatoreOrdini {
         });
         for (BarraTagliata barra : piano.barre()) {
             if (barra.sfrido() >= soglia) {
-                accumula(unione, barra.profilo(), barra.colore(), barra.sfrido(), 1);
+                accumula(unione, barra.profilo(), barra.colore(), arrotonda(barra.sfrido()), 1);
             }
         }
         return new ArrayList<>(unione.values());
+    }
+
+    /**
+     * Il ritaglio al decimo di millimetro. Gli avanzi si fondono per <b>lunghezza esatta</b>, e uno
+     * sfrido è una somma di float: due residui identici in officina possono differire di 1e-13 e
+     * diventare due righe di magazzino invece di una {@code x2}. Arrotondare qui li riunisce — e
+     * comunque nessuno rimette in rastrelliera uno spezzone quotato al nanometro.
+     */
+    private static double arrotonda(double mm) {
+        return Math.round(mm * 10.0) / 10.0;
     }
 
     /** Aggiunge {@code quantita} avanzi (profilo, colore, lunghezza), fondendoli con gli identici già presenti. */

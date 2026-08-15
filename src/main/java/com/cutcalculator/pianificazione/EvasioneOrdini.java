@@ -45,11 +45,4 @@ public record EvasioneOrdini(
             List<Avanzo> magazzinoAggiornato) {
         this(ordini, List.of(), piano, preventivoTotale, magazzinoAggiornato, List.of());
     }
-
-    /** Tutti i pezzi e tutte le lastre insieme: comodo per i totali "di tutti gli ordini". */
-    public Distinta distintaUnita() {
-        return new Distinta(
-                distinte.stream().flatMap(d -> d.distinta().pezzi().stream()).toList(),
-                distinte.stream().flatMap(d -> d.distinta().vetri().stream()).toList());
-    }
 }

@@ -43,6 +43,14 @@ public class BarraTagliata {
     private final double lunghezzaBarra;
     private final boolean avanzo;
     private final List<Pezzo> pezzi = new ArrayList<>();
+    /**
+     * Lo spazio consumato, tenuto aggiornato a ogni {@link #aggiungi}: è il numero più consultato
+     * dell'ottimizzatore. Il selettore best-fit chiama {@link #entra} e {@link #sfrido} su ogni
+     * barra aperta per ogni pezzo, e ricalcolare la somma da capo ogni volta rendeva
+     * l'impacchettamento <b>quadratico</b> nel numero di pezzi. I pezzi non si tolgono mai da una
+     * barra, quindi tenere il totale non può disallinearsi.
+     */
+    private double occupato;
 
     public BarraTagliata(Profilo profilo, Colore colore, double lunghezzaBarra, boolean avanzo) {
         this.profilo = profilo;
@@ -53,7 +61,7 @@ public class BarraTagliata {
 
     /** Spazio consumato: somma delle lunghezze più il kerf (base + diagonali) di ogni pezzo. */
     public double occupato() {
-        return pezzi.stream().mapToDouble(this::costoDi).sum();
+        return occupato;
     }
 
     /**
@@ -95,6 +103,7 @@ public class BarraTagliata {
                             + sfrido() + " mm");
         }
         pezzi.add(pezzo);
+        occupato += costoDi(pezzo);
     }
 
     public Profilo profilo() {

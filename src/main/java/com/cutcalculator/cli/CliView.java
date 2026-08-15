@@ -25,6 +25,7 @@ import com.cutcalculator.formule.Distinta;
 import com.cutcalculator.ottimizzatore.BarraTagliata;
 import com.cutcalculator.ottimizzatore.Ottimizzatore;
 import com.cutcalculator.ottimizzatore.PianoDiTaglio;
+import com.cutcalculator.ottimizzatore.Strategia;
 import com.cutcalculator.pianificazione.DistintaOrdine;
 import com.cutcalculator.pianificazione.EvasioneOrdini;
 import com.cutcalculator.pianificazione.QuotaOrdine;
@@ -105,11 +106,13 @@ public final class CliView implements View {
         System.out.println("  1) Magazzino  (" + conta(controller.totaleAvanzi(), "pezzo", "pezzi") + ")");
         System.out.println("  2) Ordini     (" + conta(controller.ordini().size(), "ordine", "ordini") + ")");
         System.out.println("  3) Unita' di misura  (" + controller.unita().descrizione() + ")");
+        System.out.println("  4) Algoritmo di ottimizzazione  (" + controller.strategia().nome() + ")");
         System.out.println("  0) Esci");
-        switch (leggiIntero("Scelta", 0, 3)) {
+        switch (leggiIntero("Scelta", 0, 4)) {
             case 1 -> menuMagazzino();
             case 2 -> menuOrdini();
             case 3 -> scegliUnita();
+            case 4 -> scegliStrategia();
             case 0 -> {
                 return false;
             }
@@ -125,6 +128,18 @@ public final class CliView implements View {
         Unita scelta = scegliDaLista("Unita' di misura:", List.of(Unita.values()), Unita::descrizione);
         controller.impostaUnita(scelta);
         System.out.println("  Misure in " + scelta.descrizione() + ".");
+    }
+
+    /**
+     * Sceglie l'euristica con cui i pezzi vengono impacchettati nelle barre. Vale dal <b>prossimo</b>
+     * calcolo: i piani gia' fatti restano quelli, non si riscrivono da soli.
+     */
+    private void scegliStrategia() {
+        Strategia scelta = scegliDaLista("Algoritmo di ottimizzazione (attuale: "
+                        + controller.strategia().nome() + "):",
+                List.of(Strategia.values()), Strategia::descrizione);
+        controller.impostaStrategia(scelta);
+        System.out.println("  I prossimi calcoli useranno: " + scelta.nome() + ".");
     }
 
     // I prezzi non sono un'impostazione: si dichiarano su ogni serramento, dove si sceglie anche il
@@ -240,9 +255,9 @@ public final class CliView implements View {
     }
 
     private void nuovoOrdine() {
-        String nome = leggiNomeOrdine("Nome del nuovo ordine> ");
-        int prossimo = controller.ordini().size() + 1;
-        Ordine ordine = controller.nuovoOrdine(nome.isBlank() ? "Ordine " + prossimo : nome);
+        String proposto = controller.nomeOrdineProposto();
+        String nome = leggiNomeOrdine("Nome del nuovo ordine [" + proposto + "]> ", null);
+        Ordine ordine = controller.nuovoOrdine(nome.isBlank() ? proposto : nome);
         System.out.println("  Creato: " + ordine.nome());
         gestisciOrdine(ordine);
     }
@@ -426,7 +441,7 @@ public final class CliView implements View {
     }
 
     private void rinominaOrdine(Ordine ordine) {
-        String nuovo = leggiNomeOrdine("Nuovo nome (vuoto = invariato)> ");
+        String nuovo = leggiNomeOrdine("Nuovo nome (vuoto = invariato)> ", ordine);
         if (nuovo.isBlank()) {
             System.out.println("  Nome invariato: " + ordine.nome());
             return;
@@ -539,15 +554,23 @@ public final class CliView implements View {
 
     /**
      * Legge il nome di un ordine (può essere vuoto: chi chiama decide il default) vietando il
-     * {@code ';'}, che è il separatore del file degli ordini e ne spezzerebbe la riga.
+     * {@code ';'}, che è il separatore del file degli ordini e ne spezzerebbe la riga, e i nomi
+     * <b>già usati</b>: gli ordini si ricaricano da disco per nome, quindi due omonimi si
+     * fonderebbero in uno solo al prossimo avvio.
+     *
+     * @param tranne l'ordine che quel nome ce l'ha già (nel rinomina), oppure {@code null}
      */
-    private String leggiNomeOrdine(String etichetta) {
+    private String leggiNomeOrdine(String etichetta, Ordine tranne) {
         while (true) {
             String riga = prompt(etichetta).trim();
-            if (riga.indexOf(';') < 0) {
+            if (riga.indexOf(';') >= 0) {
+                System.out.println("  Il nome non puo' contenere ';' (separatore del file).");
+            } else if (!riga.isBlank() && !controller.nomeLibero(riga, tranne)) {
+                System.out.println("  C'e' gia' un ordine con questo nome: due omonimi si"
+                        + " fonderebbero al prossimo avvio. Scegline un altro.");
+            } else {
                 return riga;
             }
-            System.out.println("  Il nome non puo' contenere ';' (separatore del file).");
         }
     }
 
@@ -715,8 +738,9 @@ public final class CliView implements View {
     public void piano(PianoDiTaglio piano) {
         sezione("PIANO DI TAGLIO");
         int avanziUsati = piano.numeroBarre() - piano.barreNuove();
-        System.out.printf("Barra standard: %s  |  kerf %s/taglio%n",
-                mis(Ottimizzatore.BARRA_STANDARD_DEFAULT), mis(BarraTagliata.KERF));
+        System.out.printf("Barra standard: %s  |  kerf %s/taglio  |  algoritmo: %s%n",
+                mis(Ottimizzatore.BARRA_STANDARD_DEFAULT), mis(BarraTagliata.KERF),
+                controller.strategia().nome());
         System.out.printf("Barre totali: %d  (%d nuove, %d avanzi)  |  media geom. sfrido %s%n%n",
                 piano.numeroBarre(), piano.barreNuove(), avanziUsati, mis(piano.mediaGeometricaSfrido()));
 
