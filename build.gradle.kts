@@ -10,11 +10,14 @@
 // modello e che AGP 9 ha tolto. A cadere non e' solo il modulo Android: il sync fallisce **tutto**,
 // quindi dall'IDE non parte piu' nemmeno la GUI desktop. Alzare la versione solo dopo l'IDE.
 // Conseguenza: serve di nuovo `kotlin("android")`, perche' il Kotlin integrato e' una novita' di AGP 9.
+// ⚠️ Nemmeno tutta la serie 8 va bene: **8.12.0 e' il massimo che quell'IDE accetta** ("The project is
+// using an incompatible version (AGP 8.13.2)... Latest supported version is AGP 8.12.0"). Il tetto lo
+// alza l'IDE, non noi: si sale solo dopo averlo aggiornato.
 plugins {
     kotlin("jvm") version "2.4.10" apply false
     kotlin("android") version "2.4.10" apply false
     kotlin("plugin.compose") version "2.4.10" apply false
-    id("com.android.application") version "8.13.2" apply false
+    id("com.android.application") version "8.12.0" apply false
     id("org.openjfx.javafxplugin") version "0.1.0" apply false
 }
 
