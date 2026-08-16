@@ -12,6 +12,8 @@
 
 # Package Files #
 *.jar
+# ...ma il jar del wrapper Gradle DEVE stare in repo, altrimenti ./gradlew non parte da un clone pulito
+!gradle/wrapper/gradle-wrapper.jar
 *.war
 *.nar
 *.ear
@@ -22,6 +24,9 @@
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
+# Heap dump lasciato da un OutOfMemoryError (il dexing di Android ne ha prodotto uno da 700 MB):
+# e' un artefatto di debug, pesa quanto tutto il resto del repo messo insieme.
+*.hprof
 
 # Rendered catalog pages (temporary, generated from the PDF for inspection)
 .pdf_pages/
@@ -29,6 +34,9 @@ replay_pid*
 # Compiled output
 out/
 target/
+build/
+.gradle/
+.kotlin/
 
 # IntelliJ IDEA
 .idea/
@@ -36,3 +44,20 @@ target/
 
 # Screenshot dei cataloghi (materiale di riferimento, non versionato)
 cat */
+
+# Dati di runtime (magazzino persistito su disco)
+dati/
+
+# Test JUnit (scelta dell'utente: restano locali, fuori dal versionamento)
+# Il doppio asterisco serve dopo la divisione in moduli: "src/test/" da solo e' ancorato alla
+# radice e non coprirebbe piu' core/src/test/ e desktop/src/test/.
+**/src/test/
+
+# Android: il percorso dell'SDK e' della singola macchina, lo riscrive Android Studio a ogni avvio
+local.properties
+
+# Firma dell'APK: la chiave e le sue password. Se finiscono su un repo pubblico chiunque puo'
+# pubblicare aggiornamenti a nome dell'app, e la chiave di un'app pubblicata non si puo' cambiare.
+keystore.properties
+*.jks
+*.keystore

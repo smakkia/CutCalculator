@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.SplitPane?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<!-- Tab Ordini: le commesse a sinistra, i serramenti di quella scelta a destra. -->
+<SplitPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+           fx:controller="com.cutcalculator.gui.SchermataOrdini"
+           dividerPositions="0.32">
+    <items>
+        <BorderPane>
+            <center>
+                <VBox spacing="4.0">
+                    <padding>
+                        <Insets top="10.0" right="0.0" bottom="0.0" left="0.0"/>
+                    </padding>
+                    <children>
+                        <Label text="Da calcolare" style="-fx-font-weight: bold;">
+                            <padding>
+                                <Insets top="0.0" right="10.0" bottom="4.0" left="12.0"/>
+                            </padding>
+                        </Label>
+                        <ListView fx:id="elencoDaCalcolare" VBox.vgrow="ALWAYS"/>
+                        <Label text="Calcolati" style="-fx-font-weight: bold;">
+                            <padding>
+                                <Insets top="8.0" right="10.0" bottom="4.0" left="12.0"/>
+                            </padding>
+                        </Label>
+                        <ListView fx:id="elencoCalcolati" VBox.vgrow="ALWAYS"/>
+                    </children>
+                </VBox>
+            </center>
+            <bottom>
+                <VBox spacing="8.0">
+                    <padding>
+                        <Insets top="8.0" right="12.0" bottom="12.0" left="12.0"/>
+                    </padding>
+                    <children>
+                        <Label fx:id="riepilogo" text="Nessun ordine."/>
+                        <HBox spacing="8.0">
+                            <children>
+                                <Button text="Nuovo" onAction="#nuovoOrdine"/>
+                                <Button text="Rinomina" onAction="#rinominaOrdine"/>
+                                <Button text="Rimuovi" onAction="#rimuoviOrdine"/>
+                            </children>
+                        </HBox>
+                        <Separator/>
+                        <Button fx:id="bottoneCalcola" text="Calcola gli ordini da calcolare"
+                                onAction="#calcolaTutti" maxWidth="Infinity"/>
+                    </children>
+                </VBox>
+            </bottom>
+        </BorderPane>
+
+        <BorderPane>
+            <top>
+                <Label text="Serramenti dell'ordine" style="-fx-font-weight: bold;">
+                    <padding>
+                        <Insets top="10.0" right="10.0" bottom="6.0" left="12.0"/>
+                    </padding>
+                </Label>
+            </top>
+            <center>
+                <TableView fx:id="tabellaSerramenti">
+                    <columns>
+                        <TableColumn fx:id="colonnaSistema" text="Sistema" prefWidth="130.0"/>
+                        <TableColumn fx:id="colonnaTipologia" text="Tipologia" prefWidth="240.0"/>
+                        <TableColumn fx:id="colonnaColore" text="Colore" prefWidth="110.0"/>
+                        <TableColumn fx:id="colonnaL" text="L (mm)" prefWidth="80.0"/>
+                        <TableColumn fx:id="colonnaH" text="H (mm)" prefWidth="80.0"/>
+                        <TableColumn fx:id="colonnaHF" text="HF (mm)" prefWidth="80.0"/>
+                        <TableColumn fx:id="colonnaQuantita" text="Qta" prefWidth="60.0"/>
+                        <TableColumn fx:id="colonnaVarianti" text="Varianti" prefWidth="200.0"/>
+                    </columns>
+                </TableView>
+            </center>
+            <bottom>
+                <HBox spacing="8.0">
+                    <padding>
+                        <Insets top="8.0" right="12.0" bottom="12.0" left="12.0"/>
+                    </padding>
+                    <children>
+                        <Button text="Aggiungi serramento" onAction="#aggiungiSerramento"/>
+                        <Button text="Rimuovi selezionato" onAction="#rimuoviSerramento"/>
+                        <Button text="Vedi calcolo dell'ordine" onAction="#vediCalcolo"/>
+                        <Button fx:id="bottoneRipristina" text="Ripristina ordine"
+                                onAction="#ripristinaOrdine"/>
+                    </children>
+                </HBox>
+            </bottom>
+        </BorderPane>
+    </items>
+</SplitPane>
