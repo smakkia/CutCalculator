@@ -35,22 +35,3 @@ Gli eseguibili pronti all'uso sono nella pagina delle release:
   JRE: **non serve avere Java installato**. Estrai lo zip e avvia `CutCalculator.exe`.
 - **Android** — `CutCalculator-<versione>-android.apk`. Richiede Android 8.0 o superiore. Installa
   l'APK dal telefono (va autorizzata l'installazione da origini sconosciute).
-
-## Compilare da sorgente
-
-Serve solo un **JDK 25** con `JAVA_HOME` impostato: Gradle arriva col wrapper in repo.
-
-```bash
-./gradlew runGui                  # client grafico (JavaFX)
-./gradlew run                     # client testuale
-./gradlew test                    # esegue i test
-./gradlew :desktop:zipWindows     # pacchetto Windows in desktop/build/distribuzione/
-./gradlew :android:assembleRelease # APK in android/build/outputs/apk/release/
-```
-
-Il modulo Android entra nella build solo se trova l'SDK (`ANDROID_HOME` o `local.properties`):
-senza, il resto del progetto si compila lo stesso.
-
-Il progetto è diviso in tre moduli: `core` (il motore di calcolo, Kotlin, senza interfaccia),
-`desktop` (i due client CLI e JavaFX) e `android` (l'app Compose). Il core è lo stesso per tutti i
-front-end.
