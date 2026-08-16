@@ -56,6 +56,8 @@ dati/
 # Android: il percorso dell'SDK e' della singola macchina, lo riscrive Android Studio a ogni avvio
 local.properties
 
+# Firma dell'APK: la chiave e le sue password. Se finiscono su un repo pubblico chiunque puo'
+# pubblicare aggiornamenti a nome dell'app, e la chiave di un'app pubblicata non si puo' cambiare.
+keystore.properties
 *.jks
 *.keystore
-keystore.properties

@@ -118,9 +118,10 @@ private fun DialogoAvanzo(vm: CutCalculatorViewModel, annulla: () -> Unit) {
     var quantita by remember { mutableStateOf("1") }
     var apertoMenu by remember { mutableStateOf(false) }
 
-    val mm = lunghezza.trim().replace(',', '.').toDoubleOrNull()
+    // Quel che l'utente scrive e' nell'unita' scelta nelle impostazioni, non per forza in mm.
+    val scritto = lunghezza.trim().replace(',', '.').toDoubleOrNull()
     val q = quantita.trim().toIntOrNull() ?: 0
-    val valido = mm != null && mm > 0 && q > 0 && colore.isNotBlank()
+    val valido = scritto != null && scritto > 0 && q > 0 && colore.isNotBlank()
 
     AlertDialog(
         onDismissRequest = annulla,
@@ -168,7 +169,7 @@ private fun DialogoAvanzo(vm: CutCalculatorViewModel, annulla: () -> Unit) {
                 OutlinedTextField(
                     value = lunghezza,
                     onValueChange = { lunghezza = it },
-                    label = { Text("Lunghezza (mm)") },
+                    label = { Text("Lunghezza (${vm.unita.simbolo()})") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
@@ -187,7 +188,7 @@ private fun DialogoAvanzo(vm: CutCalculatorViewModel, annulla: () -> Unit) {
             TextButton(
                 enabled = valido,
                 onClick = {
-                    vm.aggiungiAvanzo(profilo, colore.trim(), mm ?: 0.0, q)
+                    vm.aggiungiAvanzo(profilo, colore.trim(), vm.versoMm(scritto ?: 0.0), q)
                     annulla()
                 }
             ) { Text("Aggiungi") }

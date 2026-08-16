@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -46,11 +47,12 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** Le tre schede dell'app. */
+/** Le quattro schede dell'app. */
 private enum class Scheda(val etichetta: String, val icona: ImageVector) {
     ORDINI("Ordini", Icons.Default.Assignment),
     MAGAZZINO("Magazzino", Icons.Default.Inventory2),
-    RISULTATI("Preventivo", Icons.Default.Receipt)
+    RISULTATI("Preventivo", Icons.Default.Receipt),
+    IMPOSTAZIONI("Impostazioni", Icons.Default.Settings)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -93,6 +95,7 @@ fun AppCutCalculator(vm: CutCalculatorViewModel = viewModel()) {
                 Scheda.ORDINI -> SchermataOrdini(vm, modificatore)
                 Scheda.MAGAZZINO -> SchermataMagazzino(vm, modificatore)
                 Scheda.RISULTATI -> SchermataRisultati(vm, modificatore)
+                Scheda.IMPOSTAZIONI -> SchermataImpostazioni(vm, modificatore)
             }
         }
     }

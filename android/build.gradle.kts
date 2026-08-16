@@ -1,13 +1,16 @@
 // L'app per il telefono. Non contiene logica: tutto il calcolo sta in :core, esattamente lo stesso
 // modulo che usa il client desktop. Qui dentro ci sono solo le schermate Compose e il ponte verso
 // il Controller.
-// ⚠️ Niente `kotlin("android")`: da AGP 9.0 il supporto Kotlin e' **dentro** il plugin Android, e
-// applicarlo di nuovo fa fallire la configurazione (vedi kotl.in/gradle/agp-built-in-kotlin).
+// ⚠️ `kotlin("android")` serve perche' l'AGP e' fermo alla serie 8 (il perche' e' nel build.gradle.kts
+// di radice): il supporto Kotlin integrato, che renderebbe superfluo questo plugin, arriva con AGP 9.
+// Se un domani si passera' alla 9, questa riga va **tolta**, altrimenti la configurazione fallisce con
+// un errore illeggibile ("java.lang.Throwable (no error message)").
 
 import java.util.Properties
 
 plugins {
     id("com.android.application")
+    kotlin("android")
     kotlin("plugin.compose")
 }
 
@@ -26,8 +29,11 @@ android {
         applicationId = "com.cutcalculator.android"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        // versionCode e' il numero che Android confronta per decidere se un APK e' un aggiornamento:
+        // deve **crescere** a ogni rilascio, altrimenti l'installazione viene rifiutata come downgrade.
+        // versionName e' solo l'etichetta che si legge nelle impostazioni del telefono.
+        versionCode = 2
+        versionName = "0.2.0"
     }
 
     buildFeatures {
@@ -39,28 +45,32 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlin {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        }
-    }
-
-    signingConfigs {
-        create("release") {
-            storeFile = rootProject.file(
-                keystoreProperties["storeFile"] as String
-            )
-            storePassword = keystoreProperties["storePassword"] as String
-            keyAlias = keystoreProperties["keyAlias"] as String
-            keyPassword = keystoreProperties["keyPassword"] as String
+    // La firma di release sta in keystore.properties, che e' fuori dal versionamento. Senza quel file
+    // il blocco si salta: altrimenti la build **debug** morirebbe in configurazione su una macchina
+    // che il keystore non ce l'ha (i cast a String su valori assenti lanciano subito).
+    if (keystorePropertiesFile.exists()) {
+        signingConfigs {
+            create("release") {
+                storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+            }
         }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = signingConfigs.findByName("release")
         }
+    }
+}
+
+// Con AGP 8 il plugin Kotlin e' esterno, quindi la sua estensione sta **fuori** dal blocco android.
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 

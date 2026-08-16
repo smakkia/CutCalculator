@@ -36,7 +36,8 @@ import com.cutcalculator.dominio.Tipologia
  * - il campo **HF** (altezza parziale) compare **solo** se la tipologia lo usa — cioè per le porte
  *   col traverso. Chiederlo sempre confonderebbe, e per le finestre vale comunque 0.
  *
- * Le misure si scrivono in millimetri, con la virgola o il punto.
+ * Le misure si scrivono nell'unità scelta nelle impostazioni, con la virgola o il punto, e vengono
+ * riportate in millimetri prima di entrare nel modello — che è **sempre** in millimetri.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,10 +75,11 @@ fun DialogoSerramento(
                 }
                 Menu("Tipologia", sistema.tipologie(), tipologia, { it.nome() }) { tipologia = it }
 
-                Numero("Larghezza L (mm)", larghezza) { larghezza = it }
-                Numero("Altezza H (mm)", altezza) { altezza = it }
+                val simbolo = vm.unita.simbolo()
+                Numero("Larghezza L ($simbolo)", larghezza) { larghezza = it }
+                Numero("Altezza H ($simbolo)", altezza) { altezza = it }
                 if (tipologia.usaHF()) {
-                    Numero("Altezza parziale HF (mm)", altezzaParziale) { altezzaParziale = it }
+                    Numero("Altezza parziale HF ($simbolo)", altezzaParziale) { altezzaParziale = it }
                     Text(
                         "Questa tipologia ha il traverso: HF e' l'altezza della parte sotto.",
                         style = MaterialTheme.typography.bodySmall
@@ -105,12 +107,13 @@ fun DialogoSerramento(
             TextButton(
                 enabled = valido,
                 onClick = {
+                    // Solo le misure si convertono: i prezzi sono EUR/kg e EUR/mq, non lunghezze.
                     conferma(
                         tipologia,
                         colore.trim(),
-                        l ?: 0.0,
-                        h ?: 0.0,
-                        hf ?: 0.0,
+                        vm.versoMm(l ?: 0.0),
+                        vm.versoMm(h ?: 0.0),
+                        vm.versoMm(hf ?: 0.0),
                         q,
                         prezzoKg.misura() ?: 0.0,
                         prezzoMq.misura() ?: 0.0

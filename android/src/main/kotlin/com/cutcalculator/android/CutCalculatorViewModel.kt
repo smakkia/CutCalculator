@@ -3,6 +3,7 @@ package com.cutcalculator.android
 import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.neverEqualPolicy
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import com.cutcalculator.app.Controller
@@ -16,6 +17,7 @@ import com.cutcalculator.dominio.Prezzi
 import com.cutcalculator.dominio.Profilo
 import com.cutcalculator.dominio.Serramento
 import com.cutcalculator.dominio.Tipologia
+import com.cutcalculator.ottimizzatore.Strategia
 import com.cutcalculator.persistenza.ArchivioCalcoli
 import com.cutcalculator.persistenza.ArchivioImpostazioni
 import com.cutcalculator.persistenza.ArchivioMagazzino
@@ -40,12 +42,21 @@ class CutCalculatorViewModel(app: Application) : AndroidViewModel(app) {
     private val catalogo: Catalogo = Catalogo.completo()
     private val controller: Controller
 
-    /** Gli ordini, ricaricati dal controller dopo ogni modifica. */
-    var ordini by mutableStateOf<List<Ordine>>(emptyList())
+    /**
+     * Gli ordini, ricaricati dal controller dopo ogni modifica.
+     *
+     * ⚠️ [neverEqualPolicy] non è un'esagerazione, è **necessario**: `Ordine` è una classe mutabile e
+     * non ridefinisce `equals`, quindi vale l'identità. Il controller modifica gli ordini **sul posto**
+     * (evadendoli, per esempio, ne alza il flag `calcolato`) e restituisce una lista nuova con dentro
+     * gli **stessi** oggetti: con la politica predefinita, che confronta con `==`, la vecchia e la
+     * nuova lista risultano uguali e Compose **non ridisegna niente**. Si vedeva col bottone "Calcola
+     * tutti gli ordini", che restava acceso dopo un calcolo pur non essendoci più nulla da calcolare.
+     */
+    var ordini by mutableStateOf<List<Ordine>>(emptyList(), neverEqualPolicy())
         private set
 
-    /** Il magazzino degli avanzi. */
-    var magazzino by mutableStateOf<List<Avanzo>>(emptyList())
+    /** Il magazzino degli avanzi. Stessa politica degli ordini, per lo stesso motivo. */
+    var magazzino by mutableStateOf<List<Avanzo>>(emptyList(), neverEqualPolicy())
         private set
 
     /** L'ultimo calcolo globale, se ne è stato fatto uno in questa sessione. */
@@ -54,6 +65,18 @@ class CutCalculatorViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Messaggio da mostrare in una snackbar (errore o conferma); si consuma con [messaggioLetto]. */
     var messaggio by mutableStateOf<String?>(null)
+        private set
+
+    /**
+     * L'unità con cui la UI mostra e legge le misure. È uno `State` e non una lettura diretta dal
+     * controller perché il controller non notifica nessuno: senza, cambiare unità non ridisegnerebbe
+     * le schermate già in video. Il modello resta comunque **sempre in millimetri**.
+     */
+    var unita by mutableStateOf(Unita.PREDEFINITA)
+        private set
+
+    /** L'euristica del **prossimo** calcolo. Vale lo stesso discorso dell'unità. */
+    var strategia by mutableStateOf(Strategia.PREDEFINITA)
         private set
 
     init {
@@ -73,8 +96,6 @@ class CutCalculatorViewModel(app: Application) : AndroidViewModel(app) {
                     "modificare qualcosa, o il prossimo salvataggio le cancellera'."
         }
     }
-
-    val unita: Unita get() = controller.unita()
 
     val sistemi get() = catalogo.sistemi()
 
@@ -161,6 +182,27 @@ class CutCalculatorViewModel(app: Application) : AndroidViewModel(app) {
         messaggio = "Tolti $tolti pezzi dal magazzino."
     }
 
+    // --- Impostazioni -------------------------------------------------------------------
+
+    /**
+     * Cambia l'unità di misura e la persiste. Riguarda solo la presentazione: i dati su disco non si
+     * toccano, quindi passare a metri e tornare a millimetri non può perdere niente.
+     */
+    fun impostaUnita(scelta: Unita) = protetto {
+        controller.impostaUnita(scelta)
+    }
+
+    /**
+     * Cambia l'euristica di taglio e la persiste. Vale dal **prossimo** calcolo: i piani già fatti
+     * restano quelli, e riscriverne i numeri farebbe credere che siano stati rifatti.
+     */
+    fun impostaStrategia(scelta: Strategia) = protetto {
+        controller.impostaStrategia(scelta)
+    }
+
+    /** Da quel che l'utente scrive, nell'unità scelta, ai millimetri del modello. */
+    fun versoMm(valore: Double): Double = unita.versoMm(valore)
+
     // --- Infrastruttura -----------------------------------------------------------------
 
     fun messaggioLetto() {
@@ -186,5 +228,7 @@ class CutCalculatorViewModel(app: Application) : AndroidViewModel(app) {
     private fun aggiorna() {
         ordini = controller.ordini()
         magazzino = controller.magazzino()
+        unita = controller.unita()
+        strategia = controller.strategia()
     }
 }
