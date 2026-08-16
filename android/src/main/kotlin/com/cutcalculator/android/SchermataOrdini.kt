@@ -13,6 +13,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -67,6 +69,7 @@ private fun ElencoOrdini(
     apri: (Ordine) -> Unit
 ) {
     var chiediNome by remember { mutableStateOf(false) }
+    var chiediRipristino by remember { mutableStateOf(false) }
 
     Box(modifier.fillMaxSize()) {
         LazyColumn(
@@ -86,6 +89,19 @@ private fun ElencoOrdini(
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(vertical = 4.dp)
                 )
+                // Il ripristino sta qui, accanto al calcolo, e non dentro il singolo ordine: annulla
+                // **l'ultimo calcolo** per intero, non un ordine — le barre erano condivise.
+                // La condizione e' "esiste un ordine da ripristinare", non "il file c'e'": un punto
+                // di ripristino che nomina solo ordini spariti non e' annullabile.
+                if (vm.ordineDaRipristinare != null) {
+                    OutlinedButton(
+                        onClick = { chiediRipristino = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Undo, contentDescription = null)
+                        Text("  Annulla l'ultimo calcolo (${vm.ripristinabili.size})")
+                    }
+                }
             }
 
             if (vm.ordini.isEmpty()) {
@@ -123,13 +139,49 @@ private fun ElencoOrdini(
     }
 
     if (chiediNome) {
-        DialogoNuovoOrdine(
+        DialogoNomeOrdine(
+            titolo = "Nuovo ordine",
+            azione = "Crea",
             proposto = vm.nomeOrdineProposto(),
-            nomeLibero = vm::nomeLibero,
+            nomeLibero = { nome -> vm.nomeLibero(nome) },
             annulla = { chiediNome = false },
             conferma = { nome ->
                 vm.nuovoOrdine(nome)
                 chiediNome = false
+            }
+        )
+    }
+
+    if (chiediRipristino) {
+        AlertDialog(
+            onDismissRequest = { chiediRipristino = false },
+            title = { Text("Annullare l'ultimo calcolo?") },
+            text = {
+                Column {
+                    Text(
+                        "Il magazzino torna esattamente com'era prima e questi ordini tornano fra " +
+                                "quelli da fare:"
+                    )
+                    vm.ripristinabili.forEach { nome ->
+                        Text("- $nome", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Text(
+                        "I loro documenti calcolati vengono persi. Si annulla tutto il gruppo " +
+                                "insieme, perche' quel calcolo aveva unito gli ordini in un piano " +
+                                "solo, con le barre condivise.",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    vm.ripristinaUltimoCalcolo()
+                    chiediRipristino = false
+                }) { Text("Annulla il calcolo") }
+            },
+            dismissButton = {
+                TextButton(onClick = { chiediRipristino = false }) { Text("Lascia stare") }
             }
         )
     }
@@ -143,6 +195,8 @@ private fun DettaglioOrdine(
     chiudi: () -> Unit
 ) {
     var aggiungi by remember { mutableStateOf(false) }
+    var rinomina by remember { mutableStateOf(false) }
+    var vediCalcolo by remember { mutableStateOf(false) }
     val serramenti = ordine.serramenti()
 
     Box(modifier.fillMaxSize()) {
@@ -160,6 +214,9 @@ private fun DettaglioOrdine(
                         style = MaterialTheme.typography.titleLarge,
                         modifier = Modifier.weight(1f)
                     )
+                    IconButton(onClick = { rinomina = true }) {
+                        Icon(Icons.Default.Edit, contentDescription = "Rinomina ordine")
+                    }
                     IconButton(onClick = {
                         vm.rimuoviOrdine(ordine)
                         chiudi()
@@ -174,15 +231,15 @@ private fun DettaglioOrdine(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
-                    if (vm.ripristinabile(ordine)) {
-                        OutlinedButton(
-                            onClick = { vm.ripristina(ordine) },
-                            modifier = Modifier.padding(top = 4.dp)
-                        ) {
-                            Icon(Icons.Default.Undo, contentDescription = null)
-                            Text("  Annulla l'ultimo calcolo")
-                        }
-                    }
+                }
+                // I documenti si rileggono da disco, quindi ci sono anche di un ordine calcolato in
+                // una sessione precedente — e restano consultabili dopo averlo modificato.
+                OutlinedButton(
+                    onClick = { vediCalcolo = true },
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                ) {
+                    Icon(Icons.Default.Description, contentDescription = null)
+                    Text("  Vedi il calcolo dell'ordine")
                 }
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
             }
@@ -236,11 +293,36 @@ private fun DettaglioOrdine(
             }
         )
     }
+
+    if (rinomina) {
+        DialogoNomeOrdine(
+            titolo = "Rinomina ordine",
+            azione = "Rinomina",
+            proposto = ordine.nome(),
+            // "tranne l'ordine stesso": tenere il proprio nome non e' un conflitto.
+            nomeLibero = { nome -> vm.nomeLibero(nome, ordine) },
+            annulla = { rinomina = false },
+            conferma = { nome ->
+                vm.rinominaOrdine(ordine, nome)
+                rinomina = false
+            }
+        )
+    }
+
+    if (vediCalcolo) {
+        DialogoCalcolo(vm, ordine, chiudi = { vediCalcolo = false })
+    }
 }
 
+/**
+ * Il dialogo con cui si dà un nome a un ordine: lo stesso per crearne uno e per rinominarlo, perché
+ * la regola sul nome è identica nei due casi — cambia solo chi può già averlo (vedi `nomeLibero`).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DialogoNuovoOrdine(
+private fun DialogoNomeOrdine(
+    titolo: String,
+    azione: String,
     proposto: String,
     nomeLibero: (String) -> Boolean,
     annulla: () -> Unit,
@@ -251,7 +333,7 @@ private fun DialogoNuovoOrdine(
 
     AlertDialog(
         onDismissRequest = annulla,
-        title = { Text("Nuovo ordine") },
+        title = { Text(titolo) },
         text = {
             Column {
                 OutlinedTextField(
@@ -273,7 +355,7 @@ private fun DialogoNuovoOrdine(
             }
         },
         confirmButton = {
-            TextButton(onClick = { conferma(nome.trim()) }, enabled = valido) { Text("Crea") }
+            TextButton(onClick = { conferma(nome.trim()) }, enabled = valido) { Text(azione) }
         },
         dismissButton = { TextButton(onClick = annulla) { Text("Annulla") } }
     )

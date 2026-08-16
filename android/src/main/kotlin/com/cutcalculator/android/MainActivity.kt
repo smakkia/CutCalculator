@@ -51,7 +51,7 @@ class MainActivity : ComponentActivity() {
 private enum class Scheda(val etichetta: String, val icona: ImageVector) {
     ORDINI("Ordini", Icons.Default.Assignment),
     MAGAZZINO("Magazzino", Icons.Default.Inventory2),
-    RISULTATI("Preventivo", Icons.Default.Receipt),
+    RISULTATI("Risultati", Icons.Default.Receipt),
     IMPOSTAZIONI("Impostazioni", Icons.Default.Settings)
 }
 

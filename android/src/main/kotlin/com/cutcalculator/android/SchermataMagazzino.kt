@@ -111,11 +111,16 @@ fun SchermataMagazzino(vm: CutCalculatorViewModel, modifier: Modifier = Modifier
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DialogoAvanzo(vm: CutCalculatorViewModel, annulla: () -> Unit) {
-    val profili = remember { vm.profili() }
+    // I profili si scelgono **dentro un sistema**: tutti insieme sono un centinaio di codici in un
+    // menu solo, e trovare il proprio richiede di sapere gia' come si chiama.
+    val sistemi = vm.sistemi
+    var sistema by remember { mutableStateOf(sistemi.first()) }
+    val profili = sistema.profili()
     var profilo by remember { mutableStateOf(profili.first()) }
     var colore by remember { mutableStateOf("") }
     var lunghezza by remember { mutableStateOf("") }
     var quantita by remember { mutableStateOf("1") }
+    var apertoSistema by remember { mutableStateOf(false) }
     var apertoMenu by remember { mutableStateOf(false) }
 
     // Quel che l'utente scrive e' nell'unita' scelta nelle impostazioni, non per forza in mm.
@@ -128,6 +133,40 @@ private fun DialogoAvanzo(vm: CutCalculatorViewModel, annulla: () -> Unit) {
         title = { Text("Nuovo pezzo a magazzino") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
+                ExposedDropdownMenuBox(
+                    expanded = apertoSistema,
+                    onExpandedChange = { apertoSistema = it },
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
+                ) {
+                    OutlinedTextField(
+                        value = sistema.nome(),
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Sistema") },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = apertoSistema)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                    )
+                    ExposedDropdownMenu(
+                        expanded = apertoSistema,
+                        onDismissRequest = { apertoSistema = false }
+                    ) {
+                        sistemi.forEach { candidato ->
+                            DropdownMenuItem(
+                                text = { Text(candidato.nome()) },
+                                onClick = {
+                                    sistema = candidato
+                                    // Il profilo scelto e' di un altro sistema: si riparte dal primo
+                                    // di questo, invece di lasciare una coppia incoerente.
+                                    profilo = candidato.profili().first()
+                                    apertoSistema = false
+                                }
+                            )
+                        }
+                    }
+                }
                 ExposedDropdownMenuBox(
                     expanded = apertoMenu,
                     onExpandedChange = { apertoMenu = it },

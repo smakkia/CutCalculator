@@ -23,6 +23,7 @@ import com.cutcalculator.persistenza.ArchivioImpostazioni
 import com.cutcalculator.persistenza.ArchivioMagazzino
 import com.cutcalculator.persistenza.ArchivioOrdini
 import com.cutcalculator.persistenza.ArchivioRipristino
+import com.cutcalculator.persistenza.CalcoloOrdine
 import com.cutcalculator.pianificazione.EvasioneOrdini
 
 /**
@@ -62,6 +63,27 @@ class CutCalculatorViewModel(app: Application) : AndroidViewModel(app) {
     /** L'ultimo calcolo globale, se ne è stato fatto uno in questa sessione. */
     var ultimaEvasione by mutableStateOf<EvasioneOrdini?>(null)
         private set
+
+    /**
+     * I nomi degli ordini dell'**ultimo calcolo**: quelli che un ripristino rimetterebbe da fare.
+     * Vuota se non c'è niente da annullare.
+     *
+     * È uno `State` riletto in [aggiorna] e non una domanda al controller ogni volta perché quella
+     * risposta arriva **da disco**: chiederla durante la composizione vorrebbe dire leggere un file
+     * a ogni ridisegno.
+     */
+    var ripristinabili by mutableStateOf<List<String>>(emptyList())
+        private set
+
+    /**
+     * L'ordine su cui appoggiare l'annullamento, o `null` se non c'è niente da annullare.
+     *
+     * Il comando è **del calcolo**, non dell'ordine — il gruppo torna indietro tutto insieme — ma il
+     * controller vuole comunque un ordine di quel gruppo per riconoscerlo. Il bottone si mostra
+     * esattamente quando questo non è `null`: la condizione della UI e la precondizione dell'azione
+     * devono essere **la stessa cosa**, altrimenti si offre un comando che poi fallisce.
+     */
+    val ordineDaRipristinare: Ordine? get() = ordini.firstOrNull { it.nome() in ripristinabili }
 
     /** Messaggio da mostrare in una snackbar (errore o conferma); si consuma con [messaggioLetto]. */
     var messaggio by mutableStateOf<String?>(null)
@@ -108,15 +130,34 @@ class CutCalculatorViewModel(app: Application) : AndroidViewModel(app) {
 
     fun nomeOrdineProposto(): String = controller.nomeOrdineProposto()
 
-    fun nomeLibero(nome: String): Boolean = controller.nomeLibero(nome, null)
+    /**
+     * `true` se nessun **altro** ordine si chiama già così: il nome è la chiave con cui gli ordini si
+     * rileggono da disco, e due omonimi si fonderebbero in uno solo al prossimo avvio.
+     *
+     * @param tranne l'ordine a cui il nome appartiene già (nella rinomina), oppure `null`
+     */
+    fun nomeLibero(nome: String, tranne: Ordine? = null): Boolean =
+        controller.nomeLibero(nome, tranne)
 
     fun nuovoOrdine(nome: String) = protetto {
         controller.nuovoOrdine(nome)
     }
 
+    /**
+     * Cambia il nome di un ordine. Non ne tocca lo stato di calcolo, ma i documenti già archiviati
+     * restano sotto il vecchio nome e vengono **dimenticati**: è il controller a farlo, per non
+     * lasciarli lì a farsi trovare da un futuro omonimo.
+     */
+    fun rinominaOrdine(ordine: Ordine, nome: String) = protetto {
+        controller.rinominaOrdine(ordine, nome)
+    }
+
     fun rimuoviOrdine(ordine: Ordine) = protetto {
         controller.rimuoviOrdine(ordine)
     }
+
+    /** I documenti dell'ultimo calcolo di quest'ordine, riletti da disco (vuoti se non c'è). */
+    fun calcoloDi(ordine: Ordine): CalcoloOrdine = controller.calcoloDi(ordine)
 
     fun aggiungiSerramento(
         ordine: Ordine,
@@ -158,14 +199,23 @@ class CutCalculatorViewModel(app: Application) : AndroidViewModel(app) {
                 "${evasione.preventivoTotale().totaleBarreNuove()} barre nuove."
     }
 
-    fun ripristinabile(ordine: Ordine): Boolean = controller.ripristinabile(ordine)
-
-    /** Annulla l'ultimo calcolo: rimette il magazzino com'era e gli ordini fra quelli da calcolare. */
-    fun ripristina(ordine: Ordine) = protetto {
+    /**
+     * Annulla l'ultimo calcolo: rimette il magazzino esattamente com'era e riporta **tutti** gli
+     * ordini di quel calcolo fra quelli da fare.
+     *
+     * Il gruppo si annulla tutto insieme perché il calcolo lo aveva unito in un piano solo, con le
+     * barre condivise: la "parte di magazzino" di un ordine singolo non esiste.
+     */
+    fun ripristinaUltimoCalcolo() = protetto {
+        val ordine = ordineDaRipristinare
+            ?: throw IllegalStateException("Non c'e' nessun calcolo da annullare.")
         val tornati = controller.ripristina(ordine)
         ultimaEvasione = null
         messaggio = "Ripristinati: ${tornati.joinToString(", ")}"
     }
+
+    /** La soglia (mm) sopra cui un ritaglio non è scarto ma torna a magazzino come nuovo avanzo. */
+    fun sogliaRitaglio(): Double = controller.sogliaRitaglio()
 
     // --- Magazzino ----------------------------------------------------------------------
 
@@ -230,5 +280,6 @@ class CutCalculatorViewModel(app: Application) : AndroidViewModel(app) {
         magazzino = controller.magazzino()
         unita = controller.unita()
         strategia = controller.strategia()
+        ripristinabili = controller.ordiniRipristinabili()
     }
 }

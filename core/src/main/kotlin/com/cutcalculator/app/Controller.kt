@@ -184,6 +184,9 @@ class Controller @JvmOverloads constructor(
         ordini.remove(ordine)
         salvaOrdini()
         archivioCalcoli?.dimentica(ordine.nome())   // niente documenti orfani sul disco
+        // ...ne' un punto di ripristino che nomina un ordine che non c'e' piu': resterebbe offerto
+        // e non troverebbe niente da annullare.
+        archivioRipristino?.dimentica(ordine.nome())
     }
 
     /**
@@ -244,6 +247,11 @@ class Controller @JvmOverloads constructor(
      * calcolati sono archiviati **sotto il vecchio nome** e non seguono la rinomina: si dimenticano,
      * invece di restare lì a farsi trovare da un futuro omonimo.
      *
+     * Il **punto di ripristino** invece la segue, e non è un'incoerenza: i documenti descrivono un
+     * calcolo che dopo la rinomina non si può più rifare uguale, mentre l'annullamento riguarda il
+     * *magazzino*, che il cambio di nome non tocca. Senza, rinominare un ordine appena calcolato
+     * lasciava un ripristino che nominava un ordine inesistente.
+     *
      * @throws IllegalArgumentException se il nome è già di un altro ordine
      */
     fun rinominaOrdine(ordine: Ordine, nome: String) {
@@ -251,8 +259,9 @@ class Controller @JvmOverloads constructor(
         val precedente = ordine.nome()
         ordine.rinomina(nome)
         salvaOrdini()
-        if (archivioCalcoli != null && precedente != nome) {
-            archivioCalcoli.dimentica(precedente)
+        if (precedente != nome) {
+            archivioCalcoli?.dimentica(precedente)
+            archivioRipristino?.rinomina(precedente, nome)
         }
     }
 

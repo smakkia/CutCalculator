@@ -19,7 +19,7 @@ plugins {
 }
 
 group = "com.cutcalculator"
-version = "0.2.0"
+version = "0.3.1"
 
 // Scorciatoie per non dover ricordare il modulo: `./gradlew run` continua a fare quel che faceva.
 tasks.register("run") {

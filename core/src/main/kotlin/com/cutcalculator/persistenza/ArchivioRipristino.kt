@@ -82,6 +82,53 @@ class ArchivioRipristino(cartella: Path, catalogo: Catalogo) {
     }
 
     /**
+     * Segue la **rinomina** di un ordine dentro la fotografia.
+     *
+     * Serve perché qui degli ordini si salva il **nome**, che è la chiave con cui il ripristino li
+     * ritrova. Senza questo, rinominare un ordine appena calcolato lo rendeva irraggiungibile: la
+     * fotografia continuava a nominarlo alla vecchia maniera, il comando "annulla" restava offerto e
+     * non trovava più niente da annullare — e gli altri ordini del gruppo tornavano da calcolare con
+     * il magazzino riportato indietro anche per lui, che invece restava segnato calcolato.
+     *
+     * @return `true` se la fotografia conteneva quel nome
+     */
+    fun rinomina(precedente: String, nuovo: String): Boolean {
+        val ripristino = carica().orElse(null)
+        if (ripristino == null || !ripristino.contiene(precedente)) {
+            return false
+        }
+        salva(
+            ripristino.ordini().map { if (it == precedente) nuovo else it },
+            ripristino.magazzino()
+        )
+        return true
+    }
+
+    /**
+     * Toglie un ordine dalla fotografia — lo si chiama quando quell'ordine viene **eliminato**, che è
+     * l'altro modo di rendere il suo nome irraggiungibile.
+     *
+     * Se era l'ultimo del gruppo la fotografia si [cancella]: un punto di ripristino che non nomina
+     * più nessun ordine esistente non è annullabile (il magazzino di prima resta scritto, ma non c'è
+     * più nessuno a cui riportarlo), e tenerlo vorrebbe dire offrire un comando che fallisce.
+     *
+     * @return `true` se la fotografia conteneva quel nome
+     */
+    fun dimentica(ordine: String): Boolean {
+        val ripristino = carica().orElse(null)
+        if (ripristino == null || !ripristino.contiene(ordine)) {
+            return false
+        }
+        val rimasti = ripristino.ordini().filter { it != ordine }
+        if (rimasti.isEmpty()) {
+            cancella()
+        } else {
+            salva(rimasti, ripristino.magazzino())
+        }
+        return true
+    }
+
+    /**
      * Dimentica il calcolo annullabile: lo si chiama **dopo** averlo ripristinato, perché a quel punto
      * non c'è più niente da annullare e lasciare i file inviterebbe a farlo due volte.
      */
