@@ -33,7 +33,7 @@ android {
         // deve **crescere** a ogni rilascio, altrimenti l'installazione viene rifiutata come downgrade.
         // versionName e' solo l'etichetta che si legge nelle impostazioni del telefono.
         versionCode = 4
-        versionName = "0.3.1"
+        versionName = "0.4.0"
     }
 
     buildFeatures {
