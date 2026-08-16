@@ -55,3 +55,7 @@ dati/
 
 # Android: il percorso dell'SDK e' della singola macchina, lo riscrive Android Studio a ogni avvio
 local.properties
+
+*.jks
+*.keystore
+keystore.properties

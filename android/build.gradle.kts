@@ -3,9 +3,19 @@
 // il Controller.
 // ⚠️ Niente `kotlin("android")`: da AGP 9.0 il supporto Kotlin e' **dentro** il plugin Android, e
 // applicarlo di nuovo fa fallire la configurazione (vedi kotl.in/gradle/agp-built-in-kotlin).
+
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     kotlin("plugin.compose")
+}
+
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties()
+
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(keystorePropertiesFile.inputStream())
 }
 
 android {
@@ -14,8 +24,6 @@ android {
 
     defaultConfig {
         applicationId = "com.cutcalculator.android"
-        // ⚠️ minSdk 26 e non meno: :core usa java.nio.file (Path/Files) per la persistenza, che su
-        // Android esiste solo da Android 8. Abbassarlo vorrebbe dire riscrivere gli Archivi.
         minSdk = 26
         targetSdk = 36
         versionCode = 1
@@ -37,9 +45,21 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = rootProject.file(
+                keystoreProperties["storeFile"] as String
+            )
+            storePassword = keystoreProperties["storePassword"] as String
+            keyAlias = keystoreProperties["keyAlias"] as String
+            keyPassword = keystoreProperties["keyPassword"] as String
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }
