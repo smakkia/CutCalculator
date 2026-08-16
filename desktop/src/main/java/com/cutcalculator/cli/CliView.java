@@ -219,8 +219,7 @@ public final class CliView implements View {
             System.out.println("  Magazzino gia' vuoto: niente da svuotare.");
             return;
         }
-        if (!prompt("  Svuotare tutto il magazzino (" + conta(n, "pezzo", "pezzi") + ")? [s/N]> ")
-                .trim().equalsIgnoreCase("s")) {
+        if (!conferma("Svuotare tutto il magazzino (" + conta(n, "pezzo", "pezzi") + ")?")) {
             System.out.println("  Annullato: magazzino invariato.");
             return;
         }
@@ -301,10 +300,26 @@ public final class CliView implements View {
 
     private void rimuoviOrdine() {
         Ordine ordine = scegliOrdine("Quale ordine rimuovere");
-        if (ordine != null) {
-            controller.rimuoviOrdine(ordine);
-            System.out.println("  Rimosso: " + ordine.nome());
+        if (ordine == null) {
+            return;
         }
+        if (ordine.calcolato()) {
+            // Cancellarlo non rimette a magazzino il materiale gia' scalato, e porta via anche la
+            // possibilita' di annullare quel calcolo.
+            System.out.println("  !! Ordine gia' calcolato: il materiale gia' scalato dal magazzino"
+                    + " non torna indietro,");
+            System.out.println("     e il calcolo non si potra' piu' annullare.");
+        }
+        int righe = ordine.serramenti().size();
+        if (!conferma(righe == 0
+                ? "Rimuovo l'ordine vuoto \"" + ordine.nome() + "\"?"
+                : "Rimuovo \"" + ordine.nome() + "\" con i suoi "
+                        + conta(righe, "serramento", "serramenti") + "? Non si torna indietro.")) {
+            System.out.println("  Annullato: l'ordine resta.");
+            return;
+        }
+        controller.rimuoviOrdine(ordine);
+        System.out.println("  Rimosso: " + ordine.nome());
     }
 
     /** Mostra gli ordini e ne fa scegliere uno; {@code null} = nessuno / annullato. */
@@ -338,7 +353,7 @@ public final class CliView implements View {
                 conta(o.totaleSerramenti(), "serramento", "serramenti")));
         System.out.printf("  Il calcolo scarica il magazzino: gli avanzi usati vengono consumati e"
                 + " i ritagli >= %s rientrano. L'operazione salva su disco.%n", mis(controller.sogliaRitaglio()));
-        if (!prompt("  Confermi? [s/N]> ").trim().equalsIgnoreCase("s")) {
+        if (!conferma("Confermi?")) {
             System.out.println("  Annullato: magazzino invariato.");
             return;
         }
@@ -367,18 +382,20 @@ public final class CliView implements View {
                     + (ordine.calcolato() ? "calcolato" : "da calcolare") + "] ===");
             System.out.println("  1) Aggiungi serramento");
             System.out.println("  2) Mostra serramenti");
-            System.out.println("  3) Rimuovi serramento");
-            System.out.println("  4) Rinomina ordine");
-            System.out.println("  5) Mostra il calcolo (distinta, preventivo, vetri, prezzo)");
-            System.out.println("  6) Ripristina (annulla il calcolo, torna da calcolare)");
+            System.out.println("  3) Modifica serramento");
+            System.out.println("  4) Rimuovi serramento");
+            System.out.println("  5) Rinomina ordine");
+            System.out.println("  6) Mostra il calcolo (distinta, preventivo, vetri, prezzo)");
+            System.out.println("  7) Ripristina (annulla il calcolo, torna da calcolare)");
             System.out.println("  0) Indietro");
-            switch (leggiIntero("Scelta", 0, 6)) {
+            switch (leggiIntero("Scelta", 0, 7)) {
                 case 1 -> aggiungiSerramento(ordine);
                 case 2 -> ordine(ordine);
-                case 3 -> rimuoviSerramento(ordine);
-                case 4 -> rinominaOrdine(ordine);
-                case 5 -> mostraCalcolo(ordine);
-                case 6 -> ripristinaOrdine(ordine);
+                case 3 -> modificaSerramento(ordine);
+                case 4 -> rimuoviSerramento(ordine);
+                case 5 -> rinominaOrdine(ordine);
+                case 6 -> mostraCalcolo(ordine);
+                case 7 -> ripristinaOrdine(ordine);
                 case 0 -> resta = false;
             }
         }
@@ -391,7 +408,7 @@ public final class CliView implements View {
         Sistema sistema = scegliSistema();
         Tipologia tipologia = scegliDaLista(
                 "Tipologie di " + sistema.nome() + ":", sistema.tipologie(), Tipologia::nome);
-        Varianti varianti = scegliVarianti(sistema, tipologia);
+        Varianti varianti = scegliVarianti(sistema, tipologia, Varianti.NESSUNA);
         Colore colore = leggiColore("Colore");
         double l = leggiMisura("Larghezza L");
         double h = leggiMisura("Altezza H");
@@ -415,12 +432,21 @@ public final class CliView implements View {
      * fermavetro e vetro per un profilo che non viene mai tagliato. I sistemi che non dichiarano
      * varianti non chiedono nulla, quindi per gli scorrevoli la procedura resta identica a prima. La
      * prima voce di ogni elenco e' il profilo base della tipologia.
+     *
+     * @param attuali le varianti gia' scelte (nella modifica), che si possono confermare con Invio;
+     *                {@link Varianti#NESSUNA} quando il serramento e' nuovo
      */
-    private Varianti scegliVarianti(Sistema sistema, Tipologia tipologia) {
+    private Varianti scegliVarianti(Sistema sistema, Tipologia tipologia, Varianti attuali) {
         Varianti scelte = Varianti.NESSUNA;
         for (Categoria ruolo : sistema.ruoliConScelta(tipologia)) {
-            scelte = scelte.con(scegliDaLista(Etichette.ruolo(ruolo) + ":",
-                    sistema.variantiDi(ruolo), Variante::nome));
+            List<Variante> alternative = sistema.variantiDi(ruolo);
+            String titolo = Etichette.ruolo(ruolo) + ":";
+            // Su un serramento nuovo non c'e' niente da confermare: la scelta resta obbligatoria
+            // com'e' sempre stata, senza una voce marcata "attuale" che li' non vorrebbe dire nulla.
+            scelte = scelte.con(attuali.vuota()
+                    ? scegliDaLista(titolo, alternative, Variante::nome)
+                    : scegliDaLista(titolo, alternative, Variante::nome,
+                            attuali.scelte().get(ruolo)));
         }
         return scelte;
     }
@@ -443,10 +469,10 @@ public final class CliView implements View {
                 + " calcolo lo ritagliera' DA CAPO,");
         System.out.println("     contando una seconda volta il materiale gia' evaso.");
         if (controller.ripristinabile(ordine)) {
-            System.out.println("     Meglio prima \"Ripristina\" (opzione 6): annulla quel calcolo e"
+            System.out.println("     Meglio prima \"Ripristina\" (opzione 7): annulla quel calcolo e"
                     + " rimette a posto il magazzino.");
         }
-        return prompt("  Modificare comunque? [s/N]> ").trim().equalsIgnoreCase("s");
+        return conferma("Modificare comunque?");
     }
 
     /** I prezzi dell'ultimo serramento dell'ordine, o nessuno se e' il primo. */
@@ -470,8 +496,74 @@ public final class CliView implements View {
         if (scelta == 0) {
             return;
         }
+        // Si rilegge quale riga si sta togliendo: sbagliare numero e' un errore che si scoprirebbe
+        // solo al calcolo.
+        if (!conferma("Rimuovo " + riassunto(ordine.serramenti().get(scelta - 1))
+                + "? Non si torna indietro.")) {
+            System.out.println("  Annullato: il serramento resta.");
+            return;
+        }
         controller.rimuoviSerramento(ordine, scelta - 1);
         System.out.println("  Rimosso.");
+    }
+
+    /** Un serramento in una riga sola, per le domande di conferma. */
+    private String riassunto(Serramento serramento) {
+        Dimensione misure = serramento.dimensione();
+        return String.format("%s [%s] %s x %s %s%s x%d%s", serramento.tipologia().nome(),
+                serramento.colore().nome(), num(misure.L()), num(misure.H()), simbolo(),
+                misure.HF() > 0 ? " (HF " + num(misure.HF()) + ")" : "", serramento.quantita(),
+                Etichette.varianti(serramento.varianti()));
+    }
+
+    /**
+     * Corregge un serramento gia' inserito invece di toglierlo e rifarlo: si ripercorrono le stesse
+     * domande dell'inserimento, ma ognuna parte dal valore attuale, che si conferma con Invio (o
+     * con lo 0 dove si sceglie da un elenco). Alla fine il serramento viene <b>sostituito</b> al suo
+     * posto nell'ordine, che torna fra quelli da calcolare.
+     */
+    private void modificaSerramento(Ordine ordine) {
+        if (ordine.serramenti().isEmpty()) {
+            System.out.println("  Ordine vuoto: niente da modificare.");
+            return;
+        }
+        if (!confermaModificaDiCalcolato(ordine)) {
+            return;
+        }
+        ordine(ordine);
+        int scelta = leggiIntero("Quale modificare (0 = annulla)", 0, ordine.serramenti().size());
+        if (scelta == 0) {
+            return;
+        }
+        int indice = scelta - 1;
+        Serramento attuale = ordine.serramenti().get(indice);
+        System.out.println("  Invio (o 0 negli elenchi) tiene il valore attuale, tra parentesi.");
+        // Il serramento non porta con se' il proprio sistema: lo si chiede al catalogo, che lo sa
+        // dalla tipologia. Se il sistema cambia, la vecchia tipologia non e' piu' fra le opzioni e
+        // la scelta torna obbligatoria: ci pensa scegliDaLista, che ignora un attuale fuori lista.
+        Sistema sistemaAttuale = controller.catalogo().sistemaDi(attuale.tipologia()).orElse(null);
+        Sistema sistema = scegliDaLista("Sistemi disponibili:", controller.catalogo().sistemi(),
+                s -> s.nome() + " (" + s.famiglia() + ")", sistemaAttuale);
+        Tipologia tipologia = scegliDaLista("Tipologie di " + sistema.nome() + ":",
+                sistema.tipologie(), Tipologia::nome, attuale.tipologia());
+        Varianti varianti = scegliVarianti(sistema, tipologia, attuale.varianti());
+        Colore colore = leggiColore("Colore", attuale.colore());
+        Dimensione misure = attuale.dimensione();
+        double l = leggiMisura("Larghezza L", misure.L());
+        double h = leggiMisura("Altezza H", misure.H());
+        // Se la tipologia scelta adesso usa HF e prima non la usava, non c'e' un attuale da tenere:
+        // la misura si chiede senza scorciatoie, altrimenti Invio darebbe 0 e il pezzo sarebbe nullo.
+        double hf = !tipologia.usaHF() ? 0
+                : misure.HF() > 0 ? leggiMisura("Altezza parziale HF", misure.HF())
+                : leggiMisura("Altezza parziale HF");
+        int quantita = leggiQuantita("Quantita'", attuale.quantita());
+        double alKg = leggiPrezzo("Prezzo alluminio (EUR/kg)", attuale.prezzi().alChiloBarre());
+        double alMq = leggiPrezzo("Prezzo vetro (EUR/mq)", attuale.prezzi().alMqVetro());
+        controller.sostituisciSerramento(ordine, indice, new Serramento(tipologia, colore,
+                new Dimensione(l, h, hf), quantita, new Prezzi(alKg, alMq), varianti));
+        System.out.printf("  * %s / %s [%s]  %s x %s %s%s  x%d%s%n",
+                sistema.nome(), tipologia.nome(), colore.nome(), num(l), num(h), simbolo(),
+                hf > 0 ? " (HF " + mis(hf) + ")" : "", quantita, Etichette.varianti(varianti));
     }
 
     private void rinominaOrdine(Ordine ordine) {
@@ -561,7 +653,7 @@ public final class CliView implements View {
                 + " avanzi usati tornano disponibili e i ritagli rientrati spariscono.");
         System.out.println("  ATTENZIONE: si perdono le modifiche fatte a mano al magazzino dopo il"
                 + " calcolo, e i documenti (distinta, preventivo, vetri) di quegli ordini.");
-        if (!prompt("  Confermi? [s/N]> ").trim().equalsIgnoreCase("s")) {
+        if (!conferma("Confermi?")) {
             System.out.println("  Annullato: niente e' cambiato.");
             return;
         }
@@ -586,6 +678,29 @@ public final class CliView implements View {
         return opzioni.get(leggiIntero("Scelta", 1, opzioni.size()) - 1);
     }
 
+    /**
+     * Come sopra, ma con una scelta gia' fatta: la voce corrente e' marcata e lo <b>0</b> la
+     * conferma senza doverla ricercare nell'elenco.
+     * <p>
+     * Un {@code attuale} che non e' fra le opzioni (la tipologia di prima, dopo aver cambiato
+     * sistema) non e' confermabile: la scelta torna obbligatoria.
+     */
+    private <T> T scegliDaLista(String titolo, List<T> opzioni, Function<T, String> etichetta,
+            T attuale) {
+        if (attuale == null || !opzioni.contains(attuale)) {
+            return scegliDaLista(titolo, opzioni, etichetta);
+        }
+        System.out.println(titolo);
+        for (int i = 0; i < opzioni.size(); i++) {
+            T opzione = opzioni.get(i);
+            System.out.printf("  %d) %s%s%n", i + 1, etichetta.apply(opzione),
+                    opzione.equals(attuale) ? "   <- attuale" : "");
+        }
+        int scelta = leggiIntero("Scelta (0 = " + tronca(etichetta.apply(attuale), 28) + ")",
+                0, opzioni.size());
+        return scelta == 0 ? attuale : opzioni.get(scelta - 1);
+    }
+
     // --- Lettura input robusta ---------------------------------------------------------
 
     private int leggiIntero(String etichetta, int min, int max) {
@@ -606,6 +721,25 @@ public final class CliView implements View {
     private int leggiQuantita(String etichetta) {
         while (true) {
             String riga = prompt(etichetta + "> ").trim();
+            try {
+                int valore = Integer.parseInt(riga);
+                if (valore > 0) {
+                    return valore;
+                }
+            } catch (NumberFormatException ignored) {
+                // ricade nel messaggio sotto
+            }
+            System.out.println("  Inserisci un intero positivo.");
+        }
+    }
+
+    /** Come sopra, ma la riga vuota tiene la quantita' attuale (nella modifica di un serramento). */
+    private int leggiQuantita(String etichetta, int attuale) {
+        while (true) {
+            String riga = prompt(etichetta + " [" + attuale + "]> ").trim();
+            if (riga.isEmpty()) {
+                return attuale;
+            }
             try {
                 int valore = Integer.parseInt(riga);
                 if (valore > 0) {
@@ -656,6 +790,21 @@ public final class CliView implements View {
         }
     }
 
+    /** Come sopra, ma la riga vuota tiene il colore attuale (nella modifica di un serramento). */
+    private Colore leggiColore(String etichetta, Colore attuale) {
+        while (true) {
+            String riga = prompt(etichetta + " [" + attuale.nome() + "]> ").trim();
+            if (riga.isEmpty()) {
+                return attuale;
+            }
+            try {
+                return new Colore(riga);
+            } catch (IllegalArgumentException nonValido) {
+                System.out.println("  " + nonValido.getMessage());
+            }
+        }
+    }
+
     /**
      * Legge una misura nell'unita' scelta dall'utente e la restituisce <b>in mm</b> (il modello
      * lavora sempre in millimetri). Accetta sia la virgola sia il punto come separatore decimale.
@@ -663,6 +812,30 @@ public final class CliView implements View {
     private double leggiMisura(String etichetta) {
         while (true) {
             String riga = prompt(etichetta + " (" + simbolo() + ")> ").trim().replace(',', '.');
+            try {
+                double valore = Double.parseDouble(riga);
+                if (valore > 0) {
+                    return controller.unita().versoMm(valore);
+                }
+            } catch (NumberFormatException ignored) {
+                // ricade nel messaggio sotto
+            }
+            System.out.println("  Inserisci una misura positiva in " + simbolo()
+                    + " (es. " + esempioMisura() + ").");
+        }
+    }
+
+    /**
+     * Come sopra, ma la riga vuota tiene la misura attuale (nella modifica di un serramento). Il
+     * valore proposto e' gia' nell'unita' scelta dall'utente, come quello che si digita.
+     */
+    private double leggiMisura(String etichetta, double attuale) {
+        while (true) {
+            String riga = prompt(etichetta + " (" + simbolo() + ") [" + num(attuale) + "]> ")
+                    .trim().replace(',', '.');
+            if (riga.isEmpty()) {
+                return attuale;
+            }
             try {
                 double valore = Double.parseDouble(riga);
                 if (valore > 0) {
@@ -701,6 +874,15 @@ public final class CliView implements View {
             }
             System.out.println("  Inserisci un prezzo non negativo (es. 6,50) oppure 0.");
         }
+    }
+
+    /**
+     * Una domanda si'/no. Risponde "si'" <b>solo</b> chi scrive {@code s}: l'Invio a vuoto, come
+     * qualunque altra risposta, vale no — le domande che passano di qui riguardano cose che non si
+     * possono disfare.
+     */
+    private boolean conferma(String domanda) {
+        return prompt("  " + domanda + " [s/N]> ").trim().equalsIgnoreCase("s");
     }
 
     /** Stampa il prompt e legge una riga; {@link NoSuchElementException} a fine input = uscita. */

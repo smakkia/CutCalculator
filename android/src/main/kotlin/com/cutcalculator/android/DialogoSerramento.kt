@@ -27,12 +27,15 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MenuAnchorType
 import com.cutcalculator.app.Etichette
 import com.cutcalculator.dominio.Categoria
+import com.cutcalculator.dominio.Serramento
 import com.cutcalculator.dominio.Tipologia
 import com.cutcalculator.dominio.Variante
 import com.cutcalculator.dominio.Varianti
 
 /**
- * Il form con cui si aggiunge un serramento a un ordine.
+ * Il form con cui si aggiunge un serramento a un ordine — e con cui si **corregge** uno già
+ * inserito, passandolo come [iniziale]: i campi partono dai suoi valori e chi conferma senza
+ * toccare niente riottiene lo stesso serramento. Un form solo, così le regole non divergono.
  *
  * Tre regole prese di peso dal desktop, perché sono del dominio e non della UI:
  * - le tipologie dipendono dal sistema scelto (menu a cascata);
@@ -51,22 +54,28 @@ import com.cutcalculator.dominio.Varianti
 fun DialogoSerramento(
     vm: CutCalculatorViewModel,
     annulla: () -> Unit,
+    iniziale: Serramento? = null,
     conferma: (Tipologia, Varianti, String, Double, Double, Double, Int, Double, Double) -> Unit
 ) {
     val sistemi = vm.sistemi
-    var sistema by remember { mutableStateOf(sistemi.first()) }
-    var tipologia by remember { mutableStateOf(sistema.tipologie().first()) }
+    // Il serramento porta la tipologia ma non il sistema: lo si chiede al catalogo.
+    var sistema by remember {
+        mutableStateOf(iniziale?.let { vm.sistemaDi(it.tipologia) } ?: sistemi.first())
+    }
+    var tipologia by remember { mutableStateOf(iniziale?.tipologia ?: sistema.tipologie().first()) }
     // Le scelte fatte finora, per ruolo. Si tengono in una mappa e non in una Varianti perché qui
     // serve anche sapere *quale* voce evidenziare nel menu, e le scelte vanno ripulite quando
     // cambia il sistema (le varianti sono sue) o la tipologia (che può non usare quel ruolo).
-    var scelte by remember { mutableStateOf(emptyMap<Categoria, Variante>()) }
-    var colore by remember { mutableStateOf("") }
-    var larghezza by remember { mutableStateOf("") }
-    var altezza by remember { mutableStateOf("") }
-    var altezzaParziale by remember { mutableStateOf("") }
-    var quantita by remember { mutableStateOf("1") }
-    var prezzoKg by remember { mutableStateOf("") }
-    var prezzoMq by remember { mutableStateOf("") }
+    var scelte by remember { mutableStateOf(iniziale?.varianti?.scelte() ?: emptyMap()) }
+    var colore by remember { mutableStateOf(iniziale?.colore?.nome() ?: "") }
+    // Le misure del modello sono in mm: nei campi vanno nell'unità scelta dall'utente, che è quella
+    // con cui le rileggerà `versoMm` alla conferma.
+    var larghezza by remember { mutableStateOf(vm.testoMisura(iniziale?.dimensione?.L)) }
+    var altezza by remember { mutableStateOf(vm.testoMisura(iniziale?.dimensione?.H)) }
+    var altezzaParziale by remember { mutableStateOf(vm.testoMisura(iniziale?.dimensione?.HF)) }
+    var quantita by remember { mutableStateOf(iniziale?.quantita?.toString() ?: "1") }
+    var prezzoKg by remember { mutableStateOf(testoPrezzo(iniziale?.prezzi?.alChiloBarre)) }
+    var prezzoMq by remember { mutableStateOf(testoPrezzo(iniziale?.prezzi?.alMqVetro)) }
 
     // I ruoli da chiedere per questa coppia sistema+tipologia, e la variante corrente di ognuno: se
     // l'utente non l'ha toccata vale la prima, cioè il profilo base già cablato nella tipologia.
@@ -84,7 +93,7 @@ fun DialogoSerramento(
 
     AlertDialog(
         onDismissRequest = annulla,
-        title = { Text("Nuovo serramento") },
+        title = { Text(if (iniziale == null) "Nuovo serramento" else "Modifica serramento") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 Menu("Sistema", sistemi, sistema, { it.nome() }) { scelto ->
@@ -149,11 +158,15 @@ fun DialogoSerramento(
                         prezzoMq.misura() ?: 0.0
                     )
                 }
-            ) { Text("Aggiungi") }
+            ) { Text(if (iniziale == null) "Aggiungi" else "Salva") }
         },
         dismissButton = { TextButton(onClick = annulla) { Text("Annulla") } }
     )
 }
+
+/** Un prezzo da riscrivere in un campo: vuoto se non era impostato (zero = "non impostato"). */
+private fun testoPrezzo(euro: Double?): String =
+    euro?.takeIf { it > 0 }?.toString() ?: ""
 
 /** Menu a tendina generico: mostra `etichetta(elemento)` e restituisce l'elemento scelto. */
 @OptIn(ExperimentalMaterial3Api::class)

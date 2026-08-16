@@ -90,6 +90,7 @@
                     </padding>
                     <children>
                         <Button text="Aggiungi serramento" onAction="#aggiungiSerramento"/>
+                        <Button text="Modifica serramento" onAction="#modificaSerramento"/>
                         <Button text="Rimuovi selezionato" onAction="#rimuoviSerramento"/>
                         <Button text="Vedi calcolo dell'ordine" onAction="#vediCalcolo"/>
                         <Button fx:id="bottoneRipristina" text="Ripristina ordine"

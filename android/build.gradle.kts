@@ -32,8 +32,8 @@ android {
         // versionCode e' il numero che Android confronta per decidere se un APK e' un aggiornamento:
         // deve **crescere** a ogni rilascio, altrimenti l'installazione viene rifiutata come downgrade.
         // versionName e' solo l'etichetta che si legge nelle impostazioni del telefono.
-        versionCode = 4
-        versionName = "0.4.0"
+        versionCode = 5
+        versionName = "0.5.0"
     }
 
     buildFeatures {

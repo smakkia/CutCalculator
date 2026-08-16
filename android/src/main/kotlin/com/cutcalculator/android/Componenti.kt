@@ -9,10 +9,12 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,6 +26,32 @@ import androidx.compose.ui.unit.dp
  * tendina**. Stanno qui e non dentro una schermata perché li usano sia i risultati del calcolo
  * globale sia i documenti del singolo ordine, e ricopiarli farebbe divergere le due viste.
  */
+
+/**
+ * La domanda da fare prima di cancellare qualcosa: un ordine, un serramento, un pezzo di magazzino.
+ *
+ * Il bottone che conferma porta il nome di quel che fa ("Elimina", "Togli") invece di un "OK" che
+ * non dice niente, e l'annullamento è la via d'uscita anche toccando fuori dal dialogo.
+ *
+ * @param testo cosa si sta per cancellare, scritto per esteso: è l'ultima occasione per accorgersi
+ *              di aver toccato la riga sbagliata
+ */
+@Composable
+fun DialogoConferma(
+    titolo: String,
+    testo: String,
+    azione: String,
+    annulla: () -> Unit,
+    conferma: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = annulla,
+        title = { Text(titolo) },
+        text = { Text(testo) },
+        confirmButton = { TextButton(onClick = conferma) { Text(azione) } },
+        dismissButton = { TextButton(onClick = annulla) { Text("Annulla") } }
+    )
+}
 
 /** Una riga "etichetta → valore", il mattone con cui sono scritti preventivo e documenti. */
 @Composable

@@ -160,6 +160,9 @@ class CutCalculatorViewModel(app: Application) : AndroidViewModel(app) {
     /** I documenti dell'ultimo calcolo di quest'ordine, riletti da disco (vuoti se non c'è). */
     fun calcoloDi(ordine: Ordine): CalcoloOrdine = controller.calcoloDi(ordine)
 
+    /** Il sistema a cui appartiene una tipologia: il [Serramento] porta solo la seconda. */
+    fun sistemaDi(tipologia: Tipologia) = catalogo.sistemaDi(tipologia).orElse(sistemi.first())
+
     fun aggiungiSerramento(
         ordine: Ordine,
         tipologia: Tipologia,
@@ -172,19 +175,75 @@ class CutCalculatorViewModel(app: Application) : AndroidViewModel(app) {
         prezzoKg: Double,
         prezzoMq: Double
     ) = protetto {
-        val serramento = Serramento(
-            tipologia,
-            Colore(colore),
-            Dimensione(l, h, hf),
-            quantita,
-            Prezzi(prezzoKg, prezzoMq),
-            varianti
+        controller.aggiungiSerramento(
+            ordine, serramento(tipologia, varianti, colore, l, h, hf, quantita, prezzoKg, prezzoMq)
         )
-        controller.aggiungiSerramento(ordine, serramento)
     }
 
+    /**
+     * Corregge il serramento in posizione [indice] sostituendolo con la versione nuova: i
+     * `Serramento` sono immutabili, quindi "modificarne uno" vuol dire rimpiazzarlo. L'ordine torna
+     * fra quelli da calcolare, come per ogni altra modifica.
+     */
+    fun modificaSerramento(
+        ordine: Ordine,
+        indice: Int,
+        tipologia: Tipologia,
+        varianti: Varianti,
+        colore: String,
+        l: Double,
+        h: Double,
+        hf: Double,
+        quantita: Int,
+        prezzoKg: Double,
+        prezzoMq: Double
+    ) = protetto {
+        if (rigaSparita(ordine, indice)) {
+            return@protetto
+        }
+        controller.sostituisciSerramento(
+            ordine, indice,
+            serramento(tipologia, varianti, colore, l, h, hf, quantita, prezzoKg, prezzoMq)
+        )
+    }
+
+    private fun serramento(
+        tipologia: Tipologia,
+        varianti: Varianti,
+        colore: String,
+        l: Double,
+        h: Double,
+        hf: Double,
+        quantita: Int,
+        prezzoKg: Double,
+        prezzoMq: Double
+    ) = Serramento(
+        tipologia,
+        Colore(colore),
+        Dimensione(l, h, hf),
+        quantita,
+        Prezzi(prezzoKg, prezzoMq),
+        varianti
+    )
+
     fun rimuoviSerramento(ordine: Ordine, indice: Int) = protetto {
+        if (rigaSparita(ordine, indice)) {
+            return@protetto
+        }
         controller.rimuoviSerramento(ordine, indice)
+    }
+
+    /**
+     * `true` (con messaggio) se quella riga non esiste più: la schermata mostrava un elenco superato.
+     * Meglio dirlo che passare l'indice al controller, dove diventerebbe una
+     * `IndexOutOfBoundsException` — cioè l'app che si chiude.
+     */
+    private fun rigaSparita(ordine: Ordine, indice: Int): Boolean {
+        if (indice in ordine.serramenti().indices) {
+            return false
+        }
+        messaggio = "Quel serramento non c'e' piu': l'elenco e' stato aggiornato."
+        return true
     }
 
     /**
@@ -256,6 +315,14 @@ class CutCalculatorViewModel(app: Application) : AndroidViewModel(app) {
     /** Da quel che l'utente scrive, nell'unità scelta, ai millimetri del modello. */
     fun versoMm(valore: Double): Double = unita.versoMm(valore)
 
+    /**
+     * La strada opposta, per riempire un campo con una misura già inserita: dai millimetri del
+     * modello all'unità scelta. Vuota se la misura non c'è o vale zero (l'HF delle finestre), così
+     * il campo resta da compilare invece di proporre uno zero che non sarebbe accettato.
+     */
+    fun testoMisura(mm: Double?): String =
+        if (mm == null || mm <= 0) "" else unita.formatta(mm)
+
     // --- Infrastruttura -----------------------------------------------------------------
 
     fun messaggioLetto() {
@@ -266,10 +333,17 @@ class CutCalculatorViewModel(app: Application) : AndroidViewModel(app) {
      * Esegue un'operazione e riallinea lo stato. Gli errori del dominio (misure impossibili, nome
      * gia' usato, pezzo piu' lungo della barra) arrivano come eccezioni con un messaggio scritto per
      * l'utente: si mostrano invece di far chiudere l'app.
+     *
+     * Fra questi c'è anche [IndexOutOfBoundsException]: chi agisce su una riga la indica per
+     * posizione, e una schermata rimasta indietro può indicarne una che non c'è più. Chi chiama
+     * dovrebbe accorgersene prima (vedi `rigaSparita`), ma il ripiego qui evita che una svista
+     * chiuda l'app con i dati a metà.
      */
     private inline fun protetto(azione: () -> Unit) {
         try {
             azione()
+        } catch (errore: IndexOutOfBoundsException) {
+            messaggio = "Quella riga non c'e' piu': l'elenco e' stato aggiornato."
         } catch (errore: IllegalArgumentException) {
             messaggio = errore.message ?: "Operazione non valida."
         } catch (errore: IllegalStateException) {

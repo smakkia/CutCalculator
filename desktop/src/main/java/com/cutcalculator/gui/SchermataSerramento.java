@@ -30,6 +30,10 @@ import java.util.OptionalDouble;
  * Il modulo "aggiungi serramento" ({@code serramento.fxml}), mostrato dentro un dialogo da
  * {@link DialogoSerramento}: scelta del sistema, della tipologia, colore, misure e quantità.
  * <p>
+ * Lo stesso modulo serve anche a <b>correggere</b> un serramento già inserito: {@link #precompila}
+ * riporta nei campi quello di partenza, e il dialogo restituisce la versione corretta. Le regole
+ * sono le stesse — una sola schermata, così non possono divergere.
+ * <p>
  * Le due ComboBox sono <b>a cascata</b> (il sistema decide le tipologie) e il campo <b>HF</b>
  * (altezza parziale) si abilita solo per le tipologie che la usano — le porte, dove il traverso
  * spezza il vetro: {@link Tipologia#usaHF()}.
@@ -55,6 +59,8 @@ public final class SchermataSerramento {
     @FXML private GridPane grigliaVarianti;
 
     private Unita unita = Unita.PREDEFINITA;
+    /** Serve a risalire dal serramento da correggere al suo sistema, che il serramento non porta. */
+    private Catalogo catalogo;
     /** Una ComboBox per ruolo con alternative, ricostruite a ogni cambio di sistema. */
     private final Map<Categoria, ComboBox<Variante>> sceltaVarianti = new EnumMap<>(Categoria.class);
 
@@ -79,6 +85,7 @@ public final class SchermataSerramento {
      */
     public void inizializza(Catalogo catalogo, Unita unita, Prezzi predefiniti) {
         this.unita = unita;
+        this.catalogo = catalogo;
         campoPrezzoKg.setText(predefiniti.alChiloBarre() > 0
                 ? String.valueOf(predefiniti.alChiloBarre()) : "");
         campoPrezzoMq.setText(predefiniti.alMqVetro() > 0
@@ -91,6 +98,37 @@ public final class SchermataSerramento {
         etichettaL.setText("Larghezza L (" + unita.simbolo() + ")");
         etichettaH.setText("Altezza H (" + unita.simbolo() + ")");
         etichettaHF.setText("Altezza parziale HF (" + unita.simbolo() + ")");
+    }
+
+    /**
+     * Riporta nei campi un serramento già inserito, per correggerlo invece di toglierlo e rifarlo.
+     * Va chiamata <b>dopo</b> {@link #inizializza}.
+     * <p>
+     * L'ordine conta: il sistema si sceglie per primo (il serramento non lo porta con sé, lo si
+     * chiede al catalogo dalla tipologia), poi la tipologia — è il suo listener a ricostruire le
+     * righe delle varianti — e solo allora si possono selezionare le varianti scelte. L'HF si scrive
+     * per ultimo perché il cambio di tipologia, se non la usa, pulisce il campo.
+     */
+    public void precompila(Serramento serramento) {
+        catalogo.sistemaDi(serramento.tipologia())
+                .ifPresent(sistema -> sceltaSistema.getSelectionModel().select(sistema));
+        sceltaTipologia.getSelectionModel().select(serramento.tipologia());
+        serramento.varianti().scelte().forEach((ruolo, variante) -> {
+            ComboBox<Variante> scelta = sceltaVarianti.get(ruolo);
+            if (scelta != null) {
+                scelta.getSelectionModel().select(variante);
+            }
+        });
+        campoColore.setText(serramento.colore().nome());
+        Dimensione misure = serramento.dimensione();
+        campoL.setText(Etichette.misura(misure.L(), unita));
+        campoH.setText(Etichette.misura(misure.H(), unita));
+        campoHF.setText(misure.HF() > 0 ? Etichette.misura(misure.HF(), unita) : "");
+        campoQuantita.getValueFactory().setValue(serramento.quantita());
+        campoPrezzoKg.setText(serramento.prezzi().alChiloBarre() > 0
+                ? String.valueOf(serramento.prezzi().alChiloBarre()) : "");
+        campoPrezzoMq.setText(serramento.prezzi().alMqVetro() > 0
+                ? String.valueOf(serramento.prezzi().alMqVetro()) : "");
     }
 
     private void tipologieDi(Sistema sistema) {

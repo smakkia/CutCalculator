@@ -4,6 +4,7 @@ import com.cutcalculator.app.Controller;
 import com.cutcalculator.app.Etichette;
 import com.cutcalculator.app.Unita;
 import com.cutcalculator.catalogo.Sistema;
+import com.cutcalculator.dominio.Dimensione;
 import com.cutcalculator.dominio.Ordine;
 import com.cutcalculator.dominio.Prezzi;
 import com.cutcalculator.dominio.Serramento;
@@ -220,7 +221,20 @@ public final class SchermataOrdini {
     @FXML
     private void rimuoviOrdine() {
         scelto().ifPresent(ordine -> {
-            if (Dialoghi.conferma("Rimuovi ordine", "Rimuovo l'ordine \"" + ordine.nome() + "\"?")) {
+            // Un ordine calcolato ha gia' scalato il suo materiale: cancellarlo non lo rimette a
+            // magazzino, e porta via anche la possibilita' di annullare quel calcolo.
+            String avviso = ordine.calcolato()
+                    ? "\n\nL'ordine e' gia' stato calcolato: il materiale gia' scalato dal magazzino "
+                            + "non torna indietro, e il calcolo non si potra' piu' annullare."
+                    : "";
+            int righe = ordine.serramenti().size();
+            boolean conferma = Dialoghi.conferma("Rimuovi ordine",
+                    (righe == 0
+                            ? "Rimuovo l'ordine vuoto \"" + ordine.nome() + "\"?"
+                            : "Rimuovo l'ordine \"" + ordine.nome() + "\" con i suoi " + righe
+                                    + " serramenti?")
+                            + "\n\nNon si torna indietro." + avviso);
+            if (conferma) {
                 controller.rimuoviOrdine(ordine);
                 aggiorna();
             }
@@ -314,14 +328,60 @@ public final class SchermataOrdini {
 
     @FXML
     private void rimuoviSerramento() {
+        agisciSulSerramento("Seleziona la riga da rimuovere.", (ordine, indice, serramento) -> {
+            // La riga scelta si rilegge nel messaggio: la tabella si puo' ordinare per colonna, e
+            // togliere il serramento sbagliato e' un errore che si scopre solo al calcolo.
+            if (!Dialoghi.conferma("Rimuovi serramento",
+                    "Rimuovo dall'ordine \"" + ordine.nome() + "\":\n\n" + riassunto(serramento)
+                            + "\n\nNon si torna indietro.")) {
+                return;
+            }
+            controller.rimuoviSerramento(ordine, indice);
+            aggiorna();            // l'ordine torna tra quelli da calcolare
+            seleziona(ordine);
+            mostraSerramentiDi(ordine);
+        });
+    }
+
+    /** Un serramento in una riga sola, per i messaggi di conferma. */
+    private String riassunto(Serramento serramento) {
+        Dimensione misure = serramento.dimensione();
+        return serramento.tipologia().nome() + " [" + serramento.colore().nome() + "]  "
+                + Etichette.misura(misure.L(), unita()) + " x "
+                + Etichette.misuraConSimbolo(misure.H(), unita())
+                + (misure.HF() > 0 ? " (HF " + Etichette.misura(misure.HF(), unita()) + ")" : "")
+                + "  x" + serramento.quantita() + Etichette.varianti(serramento.varianti());
+    }
+
+    /**
+     * Corregge il serramento scelto invece di toglierlo e rifarlo: il dialogo parte dai suoi valori
+     * e la conferma lo <b>sostituisce</b> al suo posto, misure, colore, quantità, prezzi e varianti
+     * comprese. L'ordine torna fra quelli da calcolare, come per ogni altra modifica.
+     */
+    @FXML
+    private void modificaSerramento() {
+        agisciSulSerramento("Seleziona la riga da modificare.", (ordine, indice, serramento) ->
+                DialogoSerramento.modifica(controller.catalogo(), unita(), serramento)
+                        .ifPresent(corretto -> {
+                            controller.sostituisciSerramento(ordine, indice, corretto);
+                            aggiorna();
+                            seleziona(ordine);
+                            mostraSerramentiDi(ordine);
+                        }));
+    }
+
+    /**
+     * Il preambolo comune a "rimuovi" e "modifica": ci vuole una riga scelta e un ordine scelto, e
+     * se l'ordine è già calcolato ci vuole la conferma. L'indice si ricava <b>cercando l'oggetto</b>
+     * e non dalla riga di tabella, che l'ordinamento per colonna scollerebbe.
+     */
+    private void agisciSulSerramento(String seNessuno, AzioneSuSerramento azione) {
         Serramento selezionato = tabellaSerramenti.getSelectionModel().getSelectedItem();
         if (selezionato == null) {
-            Dialoghi.errore("Nessun serramento scelto", "Seleziona la riga da rimuovere.");
+            Dialoghi.errore("Nessun serramento scelto", seNessuno);
             return;
         }
         scelto().filter(this::confermaModificaDiCalcolato).ifPresent(ordine -> {
-            // Come in magazzino: si cerca l'oggetto, non l'indice di riga (l'ordinamento
-            // per colonna scollerebbe i due indici).
             int indice = ordine.serramenti().indexOf(selezionato);
             if (indice < 0) {
                 // La tabella mostrava una versione superata dell'ordine: meglio rinfrescarla che
@@ -332,11 +392,14 @@ public final class SchermataOrdini {
                 mostraSerramentiDi(ordine);
                 return;
             }
-            controller.rimuoviSerramento(ordine, indice);
-            aggiorna();            // l'ordine torna tra quelli da calcolare
-            seleziona(ordine);
-            mostraSerramentiDi(ordine);
+            azione.esegui(ordine, indice, selezionato);
         });
+    }
+
+    /** Cosa fare al serramento scelto, una volta trovato il suo posto nell'ordine. */
+    @FunctionalInterface
+    private interface AzioneSuSerramento {
+        void esegui(Ordine ordine, int indice, Serramento serramento);
     }
 
     /**

@@ -39,7 +39,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.cutcalculator.app.Etichette
+import com.cutcalculator.app.Unita
 import com.cutcalculator.dominio.Ordine
+import com.cutcalculator.dominio.Serramento
 
 /**
  * Gli ordini: l'elenco delle commesse e, aprendone una, i suoi serramenti.
@@ -195,9 +197,18 @@ private fun DettaglioOrdine(
     chiudi: () -> Unit
 ) {
     var aggiungi by remember { mutableStateOf(false) }
+    var daModificare by remember { mutableStateOf<Int?>(null) }
+    var daTogliere by remember { mutableStateOf<Int?>(null) }
+    var daEliminare by remember { mutableStateOf(false) }
     var rinomina by remember { mutableStateOf(false) }
     var vediCalcolo by remember { mutableStateOf(false) }
-    val serramenti = ordine.serramenti()
+    // ⚠️ I serramenti si prendono passando da `vm.ordini`, non da `ordine.serramenti()`: `Ordine` è
+    // mutabile e non notifica nessuno, quindi leggerlo direttamente non aggancerebbe questa
+    // schermata ad alcuno State. Compose vedrebbe i parametri invariati (l'oggetto `ordine` è
+    // sempre lo stesso) e **salterebbe del tutto** la ricomposizione: togliendo un serramento la
+    // riga restava a video, e ritoccare il cestino faceva cadere l'app su un indice ormai fuori
+    // posto. È lo stesso motivo per cui gli State delle liste usano `neverEqualPolicy`.
+    val serramenti = vm.ordini.firstOrNull { it === ordine }?.serramenti() ?: emptyList()
 
     Box(modifier.fillMaxSize()) {
         LazyColumn(
@@ -217,10 +228,7 @@ private fun DettaglioOrdine(
                     IconButton(onClick = { rinomina = true }) {
                         Icon(Icons.Default.Edit, contentDescription = "Rinomina ordine")
                     }
-                    IconButton(onClick = {
-                        vm.rimuoviOrdine(ordine)
-                        chiudi()
-                    }) {
+                    IconButton(onClick = { daEliminare = true }) {
                         Icon(Icons.Default.Delete, contentDescription = "Elimina ordine")
                     }
                 }
@@ -250,7 +258,6 @@ private fun DettaglioOrdine(
 
             items(serramenti.size) { indice ->
                 val serramento = serramenti[indice]
-                val d = serramento.dimensione
                 Card(Modifier.fillMaxWidth()) {
                     Row(
                         Modifier.padding(12.dp),
@@ -258,19 +265,15 @@ private fun DettaglioOrdine(
                     ) {
                         Column(Modifier.weight(1f)) {
                             Text(serramento.tipologia.nome(), fontWeight = FontWeight.Bold)
-                            val misure = "${Etichette.misura(d.L, vm.unita)} x " +
-                                    "${Etichette.misura(d.H, vm.unita)}" +
-                                    if (d.HF > 0) " (HF ${Etichette.misura(d.HF, vm.unita)})" else ""
                             Text(
-                                "$misure ${vm.unita.simbolo()} — x${serramento.quantita} — " +
-                                        serramento.colore.nome() +
-                                        // Vuota se non ce n'è, come sul desktop: gli scorrevoli e
-                                        // chi tiene i profili base restano scritti come prima.
-                                        Etichette.varianti(serramento.varianti),
+                                dettaglio(serramento, vm.unita),
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
-                        IconButton(onClick = { vm.rimuoviSerramento(ordine, indice) }) {
+                        IconButton(onClick = { daModificare = indice }) {
+                            Icon(Icons.Default.Edit, contentDescription = "Modifica serramento")
+                        }
+                        IconButton(onClick = { daTogliere = indice }) {
                             Icon(Icons.Default.Delete, contentDescription = "Togli serramento")
                         }
                     }
@@ -299,6 +302,66 @@ private fun DettaglioOrdine(
         )
     }
 
+    // Togliere una riga non si disfa: prima si rilegge quale, perche' su un telefono il dito cade
+    // vicino e la riga sbagliata si scoprirebbe solo al calcolo.
+    val indiceDaTogliere = daTogliere
+    val serramentoDaTogliere = indiceDaTogliere?.let(serramenti::getOrNull)
+    if (indiceDaTogliere != null && serramentoDaTogliere != null) {
+        DialogoConferma(
+            titolo = "Togliere il serramento?",
+            testo = serramentoDaTogliere.tipologia.nome() + "\n" +
+                    dettaglio(serramentoDaTogliere, vm.unita) + "\n\nNon si torna indietro.",
+            azione = "Togli",
+            annulla = { daTogliere = null },
+            conferma = {
+                vm.rimuoviSerramento(ordine, indiceDaTogliere)
+                daTogliere = null
+            }
+        )
+    }
+
+    if (daEliminare) {
+        DialogoConferma(
+            titolo = "Eliminare l'ordine?",
+            testo = (if (serramenti.isEmpty()) "\"${ordine.nome()}\" e' vuoto."
+                    else "\"${ordine.nome()}\" e i suoi ${serramenti.size} serramenti.") +
+                    " Non si torna indietro." +
+                    // Cancellarlo non rimette a magazzino quel che ha gia' consumato, e porta via
+                    // anche la possibilita' di annullare quel calcolo.
+                    if (ordine.calcolato()) {
+                        "\n\nL'ordine e' gia' stato calcolato: il materiale gia' scalato dal " +
+                                "magazzino non torna indietro, e il calcolo non si potra' piu' " +
+                                "annullare."
+                    } else "",
+            azione = "Elimina",
+            annulla = { daEliminare = false },
+            conferma = {
+                daEliminare = false
+                vm.rimuoviOrdine(ordine)
+                chiudi()
+            }
+        )
+    }
+
+    // La riga da correggere si tiene per posizione, ma il dialogo vuole il serramento: se nel
+    // frattempo e' sparita (rimossa da qui o dal ripristino) non si apre niente.
+    val indice = daModificare
+    val serramento = indice?.let(serramenti::getOrNull)
+    if (indice != null && serramento != null) {
+        DialogoSerramento(
+            vm = vm,
+            annulla = { daModificare = null },
+            iniziale = serramento,
+            conferma = { tipologia, varianti, colore, l, h, hf, quantita, prezzoKg, prezzoMq ->
+                vm.modificaSerramento(
+                    ordine, indice, tipologia, varianti, colore, l, h, hf,
+                    quantita, prezzoKg, prezzoMq
+                )
+                daModificare = null
+            }
+        )
+    }
+
     if (rinomina) {
         DialogoNomeOrdine(
             titolo = "Rinomina ordine",
@@ -317,6 +380,21 @@ private fun DettaglioOrdine(
     if (vediCalcolo) {
         DialogoCalcolo(vm, ordine, chiudi = { vediCalcolo = false })
     }
+}
+
+/**
+ * Un serramento senza il nome della tipologia, che gli sta sempre accanto in grassetto: misure,
+ * quantità, colore e varianti. La stessa riga serve nell'elenco e nella domanda di conferma prima
+ * di toglierlo — una forma sola, così quel che si legge nel dialogo è quel che si è toccato.
+ */
+private fun dettaglio(serramento: Serramento, unita: Unita): String {
+    val d = serramento.dimensione
+    val hf = if (d.HF > 0) " (HF ${Etichette.misura(d.HF, unita)})" else ""
+    return "${Etichette.misura(d.L, unita)} x ${Etichette.misura(d.H, unita)}$hf " +
+            "${unita.simbolo()} — x${serramento.quantita} — ${serramento.colore.nome()}" +
+            // Vuota se non ce n'è, come sul desktop: gli scorrevoli e chi tiene i profili base
+            // restano scritti come prima.
+            Etichette.varianti(serramento.varianti)
 }
 
 /**
