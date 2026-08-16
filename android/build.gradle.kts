@@ -14,6 +14,10 @@ plugins {
     kotlin("plugin.compose")
 }
 
+// L'etichetta della versione, scritta una volta sola: la usano il `versionName` che si legge nelle
+// impostazioni del telefono e il nome del file APK.
+val versioneApp = "0.5.0"
+
 val keystorePropertiesFile = rootProject.file("keystore.properties")
 val keystoreProperties = Properties()
 
@@ -33,7 +37,7 @@ android {
         // deve **crescere** a ogni rilascio, altrimenti l'installazione viene rifiutata come downgrade.
         // versionName e' solo l'etichetta che si legge nelle impostazioni del telefono.
         versionCode = 5
-        versionName = "0.5.0"
+        versionName = versioneApp
     }
 
     buildFeatures {
@@ -63,6 +67,20 @@ android {
         release {
             isMinifyEnabled = false
             signingConfig = signingConfigs.findByName("release")
+        }
+    }
+}
+
+// Il nome dell'APK segue lo stesso schema del pacchetto desktop
+// (`CutCalculator-0.5.0-windows-x64.zip`): `CutCalculator-<versione>-android.apk`. Il predefinito
+// era `android-release.apk`, che fuori dalla cartella di build non dice ne' che app sia ne' quale
+// versione. La **debug** tiene il suo suffisso: ha una firma diversa e installarla sopra la release
+// fallisce, quindi le due non devono somigliarsi al punto da confonderle.
+androidComponents {
+    onVariants { variante ->
+        val suffisso = if (variante.buildType == "release") "" else "-${variante.buildType}"
+        variante.outputs.forEach { uscita ->
+            uscita.outputFileName.set("CutCalculator-$versioneApp-android$suffisso.apk")
         }
     }
 }
