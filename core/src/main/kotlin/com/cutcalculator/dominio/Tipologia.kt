@@ -1,6 +1,7 @@
 package com.cutcalculator.dominio
 
 import java.util.Collections
+import java.util.EnumSet
 
 /**
  * La "ricetta" di un tipo di serramento: un nome (es. "Finestra a 2 ante"), l'elenco completo delle
@@ -44,6 +45,20 @@ class Tipologia(nome: String, regole: List<RegolaTaglio>, regoleVetro: List<Rego
 
     /** `true` se della tipologia si conoscono le quote del vetro. */
     fun haVetro(): Boolean = regoleVetro.isNotEmpty()
+
+    /**
+     * I ruoli ([Categoria]) che compaiono davvero nelle sue regole: gli unici per cui ha senso
+     * scegliere una [Variante].
+     *
+     * Le varianti sono dichiarate per **sistema**, non per tipologia, perché telaio e anta si
+     * scelgono separatamente e il prodotto cartesiano darebbe un catalogo ingestibile. Ma non tutte
+     * le tipologie di un sistema usano tutti i ruoli: un elemento fisso non ha ante, e lasciar
+     * scegliere "anta maggiorata" su un fisso accorcerebbe fermavetro e vetro per un profilo che non
+     * c'è — quote sbagliate senza nessun errore, perché il restringimento guarda il *livello* della
+     * categoria e non se quel profilo sia stato davvero tagliato.
+     */
+    fun ruoli(): Set<Categoria> =
+        regole.mapTo(EnumSet.noneOf(Categoria::class.java)) { it.profilo.categoria }
 
     override fun equals(other: Any?): Boolean =
         this === other || (other is Tipologia &&

@@ -25,16 +25,23 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MenuAnchorType
-import com.cutcalculator.catalogo.Sistema
+import com.cutcalculator.app.Etichette
+import com.cutcalculator.dominio.Categoria
 import com.cutcalculator.dominio.Tipologia
+import com.cutcalculator.dominio.Variante
+import com.cutcalculator.dominio.Varianti
 
 /**
  * Il form con cui si aggiunge un serramento a un ordine.
  *
- * Due regole prese di peso dal desktop, perché sono del dominio e non della UI:
+ * Tre regole prese di peso dal desktop, perché sono del dominio e non della UI:
  * - le tipologie dipendono dal sistema scelto (menu a cascata);
  * - il campo **HF** (altezza parziale) compare **solo** se la tipologia lo usa — cioè per le porte
  *   col traverso. Chiederlo sempre confonderebbe, e per le finestre vale comunque 0.
+ * - le **varianti** si chiedono un ruolo alla volta (telaio, anta...), solo per i ruoli che hanno
+ *   davvero un'alternativa **e** che la tipologia usa: un elemento fisso non ha ante, e sceglierne
+ *   una lì accorcerebbe fermavetro e vetro per un profilo mai tagliato. Gli scorrevoli, che di
+ *   varianti non ne dichiarano, non mostrano niente.
  *
  * Le misure si scrivono nell'unità scelta nelle impostazioni, con la virgola o il punto, e vengono
  * riportate in millimetri prima di entrare nel modello — che è **sempre** in millimetri.
@@ -44,11 +51,15 @@ import com.cutcalculator.dominio.Tipologia
 fun DialogoSerramento(
     vm: CutCalculatorViewModel,
     annulla: () -> Unit,
-    conferma: (Tipologia, String, Double, Double, Double, Int, Double, Double) -> Unit
+    conferma: (Tipologia, Varianti, String, Double, Double, Double, Int, Double, Double) -> Unit
 ) {
     val sistemi = vm.sistemi
     var sistema by remember { mutableStateOf(sistemi.first()) }
     var tipologia by remember { mutableStateOf(sistema.tipologie().first()) }
+    // Le scelte fatte finora, per ruolo. Si tengono in una mappa e non in una Varianti perché qui
+    // serve anche sapere *quale* voce evidenziare nel menu, e le scelte vanno ripulite quando
+    // cambia il sistema (le varianti sono sue) o la tipologia (che può non usare quel ruolo).
+    var scelte by remember { mutableStateOf(emptyMap<Categoria, Variante>()) }
     var colore by remember { mutableStateOf("") }
     var larghezza by remember { mutableStateOf("") }
     var altezza by remember { mutableStateOf("") }
@@ -56,6 +67,13 @@ fun DialogoSerramento(
     var quantita by remember { mutableStateOf("1") }
     var prezzoKg by remember { mutableStateOf("") }
     var prezzoMq by remember { mutableStateOf("") }
+
+    // I ruoli da chiedere per questa coppia sistema+tipologia, e la variante corrente di ognuno: se
+    // l'utente non l'ha toccata vale la prima, cioè il profilo base già cablato nella tipologia.
+    val ruoli = sistema.ruoliConScelta(tipologia)
+    fun varianteDi(ruolo: Categoria): Variante =
+        scelte[ruolo] ?: sistema.variantiDi(ruolo).first()
+    val varianti = ruoli.fold(Varianti.NESSUNA) { scelta, ruolo -> scelta.con(varianteDi(ruolo)) }
 
     val l = larghezza.misura()
     val h = altezza.misura()
@@ -72,8 +90,19 @@ fun DialogoSerramento(
                 Menu("Sistema", sistemi, sistema, { it.nome() }) { scelto ->
                     sistema = scelto
                     tipologia = scelto.tipologie().first()   // le tipologie sono del sistema
+                    scelte = emptyMap()                      // e le varianti pure
                 }
-                Menu("Tipologia", sistema.tipologie(), tipologia, { it.nome() }) { tipologia = it }
+                Menu("Tipologia", sistema.tipologie(), tipologia, { it.nome() }) { scelta ->
+                    tipologia = scelta
+                    // Si tiene quel che resta possibile: chi ha appena scelto il telaio a Z non deve
+                    // ritrovarselo azzerato per aver cambiato tipologia.
+                    val ammessi = sistema.ruoliConScelta(scelta)
+                    scelte = scelte.filterKeys { it in ammessi }
+                }
+                ruoli.forEach { ruolo ->
+                    Menu(Etichette.ruolo(ruolo), sistema.variantiDi(ruolo), varianteDi(ruolo),
+                        { it.nome }) { scelta -> scelte = scelte + (ruolo to scelta) }
+                }
 
                 val simbolo = vm.unita.simbolo()
                 Numero("Larghezza L ($simbolo)", larghezza) { larghezza = it }
@@ -110,6 +139,7 @@ fun DialogoSerramento(
                     // Solo le misure si convertono: i prezzi sono EUR/kg e EUR/mq, non lunghezze.
                     conferma(
                         tipologia,
+                        varianti,
                         colore.trim(),
                         vm.versoMm(l ?: 0.0),
                         vm.versoMm(h ?: 0.0),

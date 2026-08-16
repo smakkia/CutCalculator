@@ -263,7 +263,10 @@ private fun DettaglioOrdine(
                                     if (d.HF > 0) " (HF ${Etichette.misura(d.HF, vm.unita)})" else ""
                             Text(
                                 "$misure ${vm.unita.simbolo()} — x${serramento.quantita} — " +
-                                        serramento.colore.nome(),
+                                        serramento.colore.nome() +
+                                        // Vuota se non ce n'è, come sul desktop: gli scorrevoli e
+                                        // chi tiene i profili base restano scritti come prima.
+                                        Etichette.varianti(serramento.varianti),
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
@@ -287,8 +290,10 @@ private fun DettaglioOrdine(
         DialogoSerramento(
             vm = vm,
             annulla = { aggiungi = false },
-            conferma = { tipologia, colore, l, h, hf, quantita, prezzoKg, prezzoMq ->
-                vm.aggiungiSerramento(ordine, tipologia, colore, l, h, hf, quantita, prezzoKg, prezzoMq)
+            conferma = { tipologia, varianti, colore, l, h, hf, quantita, prezzoKg, prezzoMq ->
+                vm.aggiungiSerramento(
+                    ordine, tipologia, varianti, colore, l, h, hf, quantita, prezzoKg, prezzoMq
+                )
                 aggiungi = false
             }
         )

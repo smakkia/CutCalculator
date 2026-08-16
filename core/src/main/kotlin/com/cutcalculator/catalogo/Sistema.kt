@@ -58,6 +58,16 @@ class Sistema(
     fun ruoliConScelta(): List<Categoria> =
         varianti.entries.filter { it.value.size > 1 }.map { it.key }
 
+    /**
+     * Come [ruoliConScelta], ma limitato ai ruoli che **questa tipologia usa davvero**: è questo che
+     * le UI devono chiedere. Un elemento fisso non ha ante, e una variante d'anta scelta lì
+     * accorcerebbe fermavetro e vetro senza che nessun'anta esista (vedi [Tipologia.ruoli]).
+     */
+    fun ruoliConScelta(tipologia: Tipologia): List<Categoria> {
+        val usati = tipologia.ruoli()
+        return ruoliConScelta().filter { it in usati }
+    }
+
     /** La tipologia con questo nome, se il sistema la prevede. */
     fun tipologia(nome: String): Optional<Tipologia> =
         Optional.ofNullable(tipologie.firstOrNull { it.nome() == nome })

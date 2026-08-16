@@ -17,6 +17,7 @@ import com.cutcalculator.dominio.Prezzi
 import com.cutcalculator.dominio.Profilo
 import com.cutcalculator.dominio.Serramento
 import com.cutcalculator.dominio.Tipologia
+import com.cutcalculator.dominio.Varianti
 import com.cutcalculator.ottimizzatore.Strategia
 import com.cutcalculator.persistenza.ArchivioCalcoli
 import com.cutcalculator.persistenza.ArchivioImpostazioni
@@ -162,6 +163,7 @@ class CutCalculatorViewModel(app: Application) : AndroidViewModel(app) {
     fun aggiungiSerramento(
         ordine: Ordine,
         tipologia: Tipologia,
+        varianti: Varianti,
         colore: String,
         l: Double,
         h: Double,
@@ -175,7 +177,8 @@ class CutCalculatorViewModel(app: Application) : AndroidViewModel(app) {
             Colore(colore),
             Dimensione(l, h, hf),
             quantita,
-            Prezzi(prezzoKg, prezzoMq)
+            Prezzi(prezzoKg, prezzoMq),
+            varianti
         )
         controller.aggiungiSerramento(ordine, serramento)
     }

@@ -63,11 +63,13 @@ public final class SchermataSerramento {
         campoQuantita.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1, 999, 1));
         sceltaSistema.setConverter(Campi.converter(s -> s.nome() + " (" + s.famiglia() + ")"));
         sceltaTipologia.setConverter(Campi.converter(Tipologia::nome));
-        sceltaSistema.valueProperty().addListener((osservabile, prima, adesso) -> {
-            tipologieDi(adesso);
-            variantiDi(adesso);
+        sceltaSistema.valueProperty().addListener((osservabile, prima, adesso) -> tipologieDi(adesso));
+        // Le varianti dipendono anche dalla tipologia (non tutte usano tutti i ruoli), e cambiando
+        // sistema la tipologia si riseleziona da sola: basta stare in ascolto qui.
+        sceltaTipologia.valueProperty().addListener((osservabile, prima, adesso) -> {
+            abilitaHF(adesso);
+            variantiDi(sceltaSistema.getValue(), adesso);
         });
-        sceltaTipologia.valueProperty().addListener((osservabile, prima, adesso) -> abilitaHF(adesso));
     }
 
     /**
@@ -97,21 +99,33 @@ public final class SchermataSerramento {
     }
 
     /**
-     * Ricostruisce le righe delle varianti per il sistema scelto: una ComboBox per ogni ruolo che ha
-     * davvero più di un profilo, preselezionata sul primo (quello base della tipologia). I sistemi
-     * che non dichiarano varianti — oggi gli scorrevoli — lasciano la griglia vuota e <b>nascosta</b>
+     * Ricostruisce le righe delle varianti per il sistema e la tipologia scelti: una ComboBox per
+     * ogni ruolo che ha davvero più di un profilo <b>ed è usato dalla tipologia</b>, preselezionata
+     * sul primo (quello base). Un elemento fisso non ha ante, e sceglierne una li accorcerebbe
+     * fermavetro e vetro per un profilo che non viene mai tagliato. I sistemi che non dichiarano
+     * varianti — oggi gli scorrevoli — lasciano la griglia vuota e <b>nascosta</b>
      * ({@code visible} <i>e</i> {@code managed}, altrimenti resterebbe lo spazio bianco).
+     *
+     * <p>Le scelte già fatte si conservano quando restano possibili: cambiare tipologia non deve far
+     * ripartire dal telaio base chi lo aveva appena cambiato.
      */
-    private void variantiDi(Sistema sistema) {
+    private void variantiDi(Sistema sistema, Tipologia tipologia) {
+        Map<Categoria, Variante> precedenti = varianti().scelte();
         sceltaVarianti.clear();
         grigliaVarianti.getChildren().clear();
-        List<Categoria> ruoli = sistema == null ? List.of() : sistema.ruoliConScelta();
+        List<Categoria> ruoli = sistema == null || tipologia == null
+                ? List.of() : sistema.ruoliConScelta(tipologia);
         int riga = 0;
         for (Categoria ruolo : ruoli) {
             ComboBox<Variante> scelta = new ComboBox<>();
             scelta.setConverter(Campi.converter(Variante::nome));
             scelta.getItems().setAll(sistema.variantiDi(ruolo));
-            scelta.getSelectionModel().selectFirst();
+            Variante gia = precedenti.get(ruolo);
+            if (gia != null && scelta.getItems().contains(gia)) {
+                scelta.getSelectionModel().select(gia);
+            } else {
+                scelta.getSelectionModel().selectFirst();
+            }
             scelta.setPrefWidth(320.0);
             grigliaVarianti.add(new Label(Etichette.ruolo(ruolo)), 0, riga);
             grigliaVarianti.add(scelta, 1, riga);

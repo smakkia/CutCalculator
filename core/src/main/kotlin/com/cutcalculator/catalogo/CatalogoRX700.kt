@@ -18,9 +18,24 @@ import com.cutcalculator.dominio.Variante
  * Dati reali del sistema **Twin RX 700** (battente, taglio termico), trascritti dalle schede di
  * taglio del Gruppo E (mappa config→scheda fornita dall'utente).
  *
- * Sei tipologie: **finestra 1/2 ante** (anta `RX70.201` + fermavetro `RX70.511`, montante d'incontro
- * `RX70.301`) e **porta 1/2 ante** (stessi profili + traverso `RX70.402`), queste ultime in **due
- * varianti**. Il fermavetro è una barra rettangolare → taglio 90/90.
+ * Otto tipologie: **finestra 1/2 ante** (anta `RX70.201` + fermavetro `RX70.511`, montante
+ * d'incontro `RX70.301`), **porta 1/2 ante** (stessi profili + traverso `RX70.402`) e l'**elemento
+ * fisso**, le ultime due con e senza **traverso**. Il fermavetro è una barra rettangolare → taglio
+ * 90/90.
+ *
+ * **L'elemento fisso** è lo stesso telaio di finestre e porte, senza ante: il vetro appoggia
+ * direttamente sul telaio e lo tiene il fermavetro di sempre. Dal nodo in sezione del catalogo la
+ * vista del telaio è **50 mm** (28 di telaio + 22 di fermavetro), da cui `fermavetro = L−96` e
+ * `vetro = L−66` — la stessa coppia della finestra, dove però la differenza fra i due è 34 mm perché
+ * lì il vetro è tenuto dall'**anta**, non dal telaio (qui sono 30). Le varianti di telaio funzionano
+ * come sulle altre tipologie: il fermavetro batte sul perimetro con entrambe le estremità, quindi un
+ * telaio maggiorato accorcia lui e il vetro di 24 mm per lato senza che il catalogo dica nulla.
+ * ⚠️ La quota del **traverso nel fisso** (`L−42`) è l'unica **dedotta e non confermata da una
+ * scheda**: è quella della porta (`L−130`) più gli 88 mm che l'anta occupava e qui non ci sono — la
+ * differenza fra i fermavetri delle due tipologie (92 mm per lato contro 48). Regge se il traverso si
+ * incastra nel telaio quanto si incastra nell'anta: con quel numero si infila 27 mm oltre la testa
+ * del fermavetro, esattamente come nella porta. Tutte le altre quote della tipologia sono derivate
+ * per somma e tornano.
  *
  * **Cosa non c'è.** Le schede riportano anche un gruppo "base" con anta `RX70.203` e montante
  * `RX60.301`, che qui è stato **tolto**: quel montante è della serie RX 600 e il suo peso non compare
@@ -49,6 +64,22 @@ import com.cutcalculator.dominio.Variante
  * - porta senza traverso: quelle della finestra, insieme alle sue regole di taglio.
  */
 object CatalogoRX700 {
+
+    /**
+     * Le due **teste dei fermavetri perpendicolari**, 20 mm per lato.
+     *
+     * Le schede quotano tutti e quattro i fermavetri di un riquadro alla **luce piena** (`L−184` e
+     * `H−184` insieme), che è una semplificazione: agli angoli si scontrerebbero, perché una delle
+     * due coppie deve entrare *fra* l'altra. Qui si accorciano sempre gli **orizzontali**, i
+     * verticali restano interi — una regola sola per tutto il sistema, così in officina non si deve
+     * ricordare quale tipologia fa eccezione.
+     *
+     * Si sottrae con [com.cutcalculator.dominio.Formula.meno] invece di riscrivere l'offset (184 →
+     * 224) apposta: la quota della scheda resta leggibile accanto alla correzione, e sulle formule
+     * con la divisione (`L/2 − 162`) non c'è modo di sbagliare dimezzando anche questi 40, che sono
+     * millimetri di profilo e non dipendono dalla larghezza.
+     */
+    private const val TESTE_FERMAVETRO = 40.0
 
     // --- Anagrafica profili (Gruppo B): 4° argomento = peso in kg/m, dalla voce "Peso kg/ml." ---
     private val TELAIO = Profilo("RX70.101", "Telaio ad L piccolo", Categoria.TELAIO, 1.280)
@@ -92,10 +123,63 @@ object CatalogoRX700 {
             portaUnaAnta(false),
             portaUnaAnta(true),
             portaDueAnte(false),
-            portaDueAnte(true)
+            portaDueAnte(true),
+            elementoFisso(false),
+            elementoFisso(true)
         ),
         varianti()
     )
+
+    // elemento fisso: telaio L,H ×2 (45°); fermavetro L−96/H−96 ×2 (90°, orizzontali meno le teste).
+    // Vetro: 1 × (H−66) × (L−66). Niente anta: il vetro sta sul telaio.
+    //
+    // Col traverso RX70.402 il riquadro si spezza in due, come nella porta e con lo stesso HF (dal
+    // filo esterno inferiore del telaio al filo superiore del traverso). Le quote si derivano da
+    // quelle della porta aggiungendo i millimetri che l'anta occupava e qui non ci sono; le due parti
+    // più i 96 mm di vista del traverso ridanno il pezzo intero. Nei vetri le due prese sono diverse:
+    // 15 mm per lato dove il bordo va sul telaio, 17 dove va sul traverso (che è lo stesso profilo
+    // della porta, quindi con la geometria dell'anta).
+    private fun elementoFisso(conTraverso: Boolean): Tipologia {
+        val telaioEFermavetri = listOf(
+            RegolaTaglio("Telaio (lato orizzontale)", TELAIO, perL(0.0), 2, TAGLIO_45_45),
+            RegolaTaglio("Telaio (lato verticale)", TELAIO, perH(0.0), 2, TAGLIO_45_45),
+            RegolaTaglio(
+                "Fermavetro (lato orizzontale)", FERMAVETRO, perL(96.0).meno(TESTE_FERMAVETRO),
+                if (conTraverso) 4 else 2, TAGLIO_90_90
+            )
+        )
+        if (!conTraverso) {
+            return Tipologia(
+                "Elemento fisso",
+                telaioEFermavetri + RegolaTaglio(
+                    "Fermavetro (lato verticale)", FERMAVETRO, perH(96.0), 2, TAGLIO_90_90
+                ),
+                listOf(RegolaVetro("Vetro", perH(66.0), perL(66.0), 1))
+            )
+        }
+        return Tipologia(
+            "Elemento fisso (con traverso)",
+            telaioEFermavetri + listOf(
+                // Un'estremità sola sul perimetro: dall'altra c'è il traverso, che non ingrossa.
+                RegolaTaglio(
+                    "Fermavetro (verticale, sopra traverso)", FERMAVETRO, hMenoHF(48.0), 2,
+                    TAGLIO_90_90, 1
+                ),
+                RegolaTaglio(
+                    "Fermavetro (verticale, sotto traverso)", FERMAVETRO, perHF(144.0), 2,
+                    TAGLIO_90_90, 1
+                ),
+                // ⚠️ Quota dedotta, non letta da una scheda: è quella della porta (L−130) più gli
+                // 88 mm che l'anta occupava e qui non ci sono, cioè la differenza fra i fermavetri
+                // delle due tipologie (92 − 48 per lato). Vedi CLAUDE.md, "Da confermare".
+                RegolaTaglio("Traverso", TRAVERSO_PORTA, perL(42.0), 1, TAGLIO_90_90)
+            ),
+            listOf(
+                RegolaVetro("Vetro (sopra traverso)", hMenoHF(16.0), perL(66.0), 1, 1, 2),
+                RegolaVetro("Vetro (sotto traverso)", perHF(112.0), perL(66.0), 1, 1, 2)
+            )
+        )
+    }
 
     // finestra 1 anta: telaio L,H ×2 (45°); anta RX70.201 L−40/H−40 ×2 (45°);
     // fermavetro L−184/H−184 ×2 (90°). Vetro: 1 × (H−150) × (L−150).
@@ -106,7 +190,10 @@ object CatalogoRX700 {
             RegolaTaglio("Telaio (lato verticale)", TELAIO, perH(0.0), 2, TAGLIO_45_45),
             RegolaTaglio("Anta (lato orizzontale)", ANTA, perL(40.0), 2, TAGLIO_45_45),
             RegolaTaglio("Anta (lato verticale)", ANTA, perH(40.0), 2, TAGLIO_45_45),
-            RegolaTaglio("Fermavetro (lato orizzontale)", FERMAVETRO, perL(184.0), 2, TAGLIO_90_90),
+            RegolaTaglio(
+                "Fermavetro (lato orizzontale)", FERMAVETRO, perL(184.0).meno(TESTE_FERMAVETRO), 2,
+                TAGLIO_90_90
+            ),
             RegolaTaglio("Fermavetro (lato verticale)", FERMAVETRO, perH(184.0), 2, TAGLIO_90_90)
         ),
         listOf(RegolaVetro("Vetro", perH(150.0), perL(150.0), 1))
@@ -122,7 +209,8 @@ object CatalogoRX700 {
             RegolaTaglio("Anta (lato orizzontale)", ANTA, perMezzaL(22.0), 4, TAGLIO_45_45),
             RegolaTaglio("Anta (lato verticale)", ANTA, perH(40.0), 4, TAGLIO_45_45),
             RegolaTaglio(
-                "Fermavetro (lato orizzontale)", FERMAVETRO, perMezzaL(162.0), 4, TAGLIO_90_90
+                "Fermavetro (lato orizzontale)", FERMAVETRO,
+                perMezzaL(162.0).meno(TESTE_FERMAVETRO), 4, TAGLIO_90_90
             ),
             RegolaTaglio("Fermavetro (lato verticale)", FERMAVETRO, perH(184.0), 4, TAGLIO_90_90),
             RegolaTaglio("Montante d'incontro", MONTANTE, perH(110.0), 1, TAGLIO_90_90)
@@ -146,7 +234,8 @@ object CatalogoRX700 {
                 RegolaTaglio("Anta (lato orizzontale)", ANTA, perL(40.0), 2, TAGLIO_45_45),
                 RegolaTaglio("Anta (lato verticale)", ANTA, perH(40.0), 2, TAGLIO_45_45),
                 RegolaTaglio(
-                    "Fermavetro (lato orizzontale)", FERMAVETRO, perL(184.0), 4, TAGLIO_90_90
+                    "Fermavetro (lato orizzontale)", FERMAVETRO,
+                    perL(184.0).meno(TESTE_FERMAVETRO), 4, TAGLIO_90_90
                 ),
                 // Un'estremità sola sul perimetro: dall'altra parte c'è il traverso, che non ingrossa.
                 RegolaTaglio(
@@ -184,7 +273,8 @@ object CatalogoRX700 {
                 RegolaTaglio("Anta (lato orizzontale)", ANTA, perMezzaL(22.0), 4, TAGLIO_45_45),
                 RegolaTaglio("Anta (lato verticale)", ANTA, perH(40.0), 4, TAGLIO_45_45),
                 RegolaTaglio(
-                    "Fermavetro (lato orizzontale)", FERMAVETRO, perMezzaL(162.0), 8, TAGLIO_90_90
+                    "Fermavetro (lato orizzontale)", FERMAVETRO,
+                    perMezzaL(162.0).meno(TESTE_FERMAVETRO), 8, TAGLIO_90_90
                 ),
                 RegolaTaglio(
                     "Fermavetro (verticale, sopra traverso)", FERMAVETRO, hMenoHF(92.0), 4,

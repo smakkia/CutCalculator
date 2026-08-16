@@ -391,7 +391,7 @@ public final class CliView implements View {
         Sistema sistema = scegliSistema();
         Tipologia tipologia = scegliDaLista(
                 "Tipologie di " + sistema.nome() + ":", sistema.tipologie(), Tipologia::nome);
-        Varianti varianti = scegliVarianti(sistema);
+        Varianti varianti = scegliVarianti(sistema, tipologia);
         Colore colore = leggiColore("Colore");
         double l = leggiMisura("Larghezza L");
         double h = leggiMisura("Altezza H");
@@ -410,13 +410,15 @@ public final class CliView implements View {
     }
 
     /**
-     * Chiede una variante per ogni ruolo che ne ha davvero piu' di una (telaio, anta...). I sistemi
-     * che non ne dichiarano non chiedono nulla, quindi per gli scorrevoli la procedura resta identica
-     * a prima. La prima voce di ogni elenco e' il profilo base della tipologia.
+     * Chiede una variante per ogni ruolo che ne ha davvero piu' di una (telaio, anta...) <b>e</b> che
+     * la tipologia scelta usa: un elemento fisso non ha ante, e sceglierne una li' accorcerebbe
+     * fermavetro e vetro per un profilo che non viene mai tagliato. I sistemi che non dichiarano
+     * varianti non chiedono nulla, quindi per gli scorrevoli la procedura resta identica a prima. La
+     * prima voce di ogni elenco e' il profilo base della tipologia.
      */
-    private Varianti scegliVarianti(Sistema sistema) {
+    private Varianti scegliVarianti(Sistema sistema, Tipologia tipologia) {
         Varianti scelte = Varianti.NESSUNA;
-        for (Categoria ruolo : sistema.ruoliConScelta()) {
+        for (Categoria ruolo : sistema.ruoliConScelta(tipologia)) {
             scelte = scelte.con(scegliDaLista(Etichette.ruolo(ruolo) + ":",
                     sistema.variantiDi(ruolo), Variante::nome));
         }
