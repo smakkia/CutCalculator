@@ -29,7 +29,6 @@ relative varianti di telaio e anta.
 Gli eseguibili pronti all'uso sono nella pagina delle release:
 
 **→ [Ultima release](https://github.com/smakkia/CutCalculator/releases/latest)** ·
-[tutte le release](https://github.com/smakkia/CutCalculator/releases)
 
 - **Windows** — `CutCalculator-<versione>-windows-x64.zip`. Contiene l'eseguibile con dentro la sua
   JRE: **non serve avere Java installato**. Estrai lo zip e avvia `CutCalculator.exe`.
