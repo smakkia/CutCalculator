@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Il fondo dell'adaptive icon (vedi mipmap-anydpi-v26/ic_launcher.xml): bianco, come la
+         piastra su cui poggia il disegno originale. Il nome resta quello convenzionale di Android:
+         e' la chiave che si ritrova in ogni progetto e negli strumenti dell'IDE. -->
+    <color name="ic_launcher_background">#FFFFFF</color>
+</resources>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  L'icona del launcher come "adaptive icon": due livelli sovrapposti, di cui il sistema ritaglia la
+  forma che vuole (cerchio, quadrato stondato, goccia — cambia da launcher a launcher, e l'utente
+  puo' scegliere). Per questo il disegno non arriva ai bordi: il livello in primo piano e' una tela
+  da 108 dp di cui si vedono solo i 72 centrali, e il generatore ci sta dentro con margine.
+
+  Nella cartella `mipmap-anydpi-v26`, quindi vale per Android 8 in su — che qui e' *sempre*, dato che
+  `minSdk` e' 26. Le `ic_launcher.png` nelle cartelle per densita' restano come scorta per i launcher
+  che chiedono ancora l'icona piatta.
+
+  Il fondo e' un colore pieno e non un'immagine: il disegno originale poggia su bianco, e un livello
+  di fondo bianco fa combaciare tutto senza cuciture, qualunque forma il launcher decida di tagliare.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+</adaptive-icon>

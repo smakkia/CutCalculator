@@ -33,6 +33,7 @@ final class Dialoghi {
     /** {@code true} se l'utente ha premuto OK. */
     static boolean conferma(String titolo, String domanda) {
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION, domanda, ButtonType.OK, ButtonType.CANCEL);
+        Icone.applica(alert);
         alert.setTitle(titolo);
         alert.setHeaderText(null);
         alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
@@ -41,6 +42,7 @@ final class Dialoghi {
 
     private static void mostra(Alert.AlertType tipo, String titolo, String messaggio) {
         Alert alert = new Alert(tipo);
+        Icone.applica(alert);
         alert.setTitle(titolo);
         alert.setHeaderText(null);
         if (messaggio.lines().count() > RIGHE_LUNGHE) {

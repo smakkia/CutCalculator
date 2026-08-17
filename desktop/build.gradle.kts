@@ -97,8 +97,15 @@ val pacchettoWindows by tasks.registering {
     // Il jpackage della toolchain, non quello che capita nel PATH: devono essere lo stesso JDK con
     // cui il codice e' stato compilato.
     val jdk = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) }
+    // L'icona dell'eseguibile, quella che si vede in Esplora risorse e sulla barra delle
+    // applicazioni. Su Windows jpackage pretende un **.ico** (su Mac un .icns, su Linux un .png):
+    // dentro ci sono sette taglie, da 16 a 256, ridisegnate una per una — vedi icona/genera-icone.ps1.
+    // Nota che e' un'altra cosa dall'icona della *finestra*, che JavaFX prende dalle PNG fra le
+    // risorse (vedi Icone): questa vive nell'eseguibile, quella nel programma in esecuzione.
+    val icona = rootProject.file("icona/CutCalculator.ico")
 
     inputs.dir(distribuzione)
+    inputs.file(icona)
     outputs.dir(destinazione)
 
     doLast {
@@ -122,6 +129,7 @@ val pacchettoWindows by tasks.registering {
                 "--input", distribuzione.get().asFile.absolutePath,
                 "--main-jar", "desktop.jar",
                 "--main-class", "com.cutcalculator.gui.GuiApp",
+                "--icon", icona.absolutePath,
                 "--dest", fuori.absolutePath,
                 // Senza, JavaFX avvisa a ogni avvio che carica librerie native — e dalle prossime
                 // versioni del JDK quelle chiamate verranno **bloccate**, non solo segnalate.

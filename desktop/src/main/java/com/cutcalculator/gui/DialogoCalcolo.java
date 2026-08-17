@@ -32,6 +32,7 @@ final class DialogoCalcolo {
         schermata.mostra(calcolo, ancoraValido, unita);
 
         dialogo.setTitle("Calcolo di " + ordine);
+        Icone.applica(dialogo);
         dialogo.setHeaderText(null);
         dialogo.setResizable(true);
         dialogo.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);

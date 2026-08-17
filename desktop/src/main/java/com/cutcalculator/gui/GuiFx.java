@@ -73,6 +73,7 @@ public final class GuiFx extends Application implements View {
         schermata = caricatore.getController();
         schermata.inizializza(controller);
         finestra.setTitle("CutCalculator");
+        Icone.applica(finestra);
         finestra.setScene(new Scene(radice, 1100, 720));
         finestra.show();
     }

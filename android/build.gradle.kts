@@ -76,12 +76,14 @@ android {
 // era `android-release.apk`, che fuori dalla cartella di build non dice ne' che app sia ne' quale
 // versione. La **debug** tiene il suo suffisso: ha una firma diversa e installarla sopra la release
 // fallisce, quindi le due non devono somigliarsi al punto da confonderle.
-androidComponents {
-    onVariants { variante ->
-        val suffisso = if (variante.buildType == "release") "" else "-${variante.buildType}"
-        variante.outputs.forEach { uscita ->
-            uscita.outputFileName.set("CutCalculator-$versioneApp-android$suffisso.apk")
-        }
+// ⚠️ Passa dalla vecchia `applicationVariants` perche' la Variant API nuova (`androidComponents`) in
+// AGP 8 **non espone** il nome del file: `VariantOutput.outputFileName` non esiste, ce l'ha solo
+// l'implementazione interna. Con AGP 9 `applicationVariants` sparisce e questo blocco va rifatto.
+android.applicationVariants.all {
+    val suffisso = if (buildType.name == "release") "" else "-${buildType.name}"
+    outputs.all {
+        (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName =
+            "CutCalculator-$versioneApp-android$suffisso.apk"
     }
 }
 

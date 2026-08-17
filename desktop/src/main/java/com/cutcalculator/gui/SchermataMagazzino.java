@@ -164,6 +164,7 @@ public final class SchermataMagazzino {
     private int quantiRimuoverne(Avanzo avanzo) {
         List<Integer> scelte = IntStream.rangeClosed(1, avanzo.quantita()).boxed().toList();
         ChoiceDialog<Integer> dialogo = new ChoiceDialog<>(avanzo.quantita(), scelte);
+        Icone.applica(dialogo);
         dialogo.setTitle("Rimuovi pezzo");
         dialogo.setHeaderText(Etichette.profilo(avanzo.profilo())
                 + " [" + avanzo.colore().nome() + "] da "

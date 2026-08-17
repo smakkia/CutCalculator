@@ -61,6 +61,7 @@ final class DialogoSerramento {
         }
 
         dialogo.setTitle(partenza == null ? "Aggiungi serramento" : "Modifica serramento");
+        Icone.applica(dialogo);
         dialogo.setHeaderText(null);
         dialogo.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
 

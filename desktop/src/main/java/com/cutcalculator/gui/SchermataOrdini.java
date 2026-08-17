@@ -251,6 +251,7 @@ public final class SchermataOrdini {
     private Optional<String> chiediNome(String titolo, String iniziale, Ordine tranne) {
         while (true) {
             TextInputDialog dialogo = new TextInputDialog(iniziale);
+            Icone.applica(dialogo);
             dialogo.setTitle(titolo);
             dialogo.setHeaderText(null);
             dialogo.setContentText("Nome");
