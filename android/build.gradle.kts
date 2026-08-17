@@ -16,7 +16,7 @@ plugins {
 
 // L'etichetta della versione, scritta una volta sola: la usano il `versionName` che si legge nelle
 // impostazioni del telefono e il nome del file APK.
-val versioneApp = "0.5.0"
+val versioneApp = "0.6.0"
 
 val keystorePropertiesFile = rootProject.file("keystore.properties")
 val keystoreProperties = Properties()
@@ -36,7 +36,7 @@ android {
         // versionCode e' il numero che Android confronta per decidere se un APK e' un aggiornamento:
         // deve **crescere** a ogni rilascio, altrimenti l'installazione viene rifiutata come downgrade.
         // versionName e' solo l'etichetta che si legge nelle impostazioni del telefono.
-        versionCode = 5
+        versionCode = 6
         versionName = versioneApp
     }
 
@@ -72,7 +72,7 @@ android {
 }
 
 // Il nome dell'APK segue lo stesso schema del pacchetto desktop
-// (`CutCalculator-0.5.0-windows-x64.zip`): `CutCalculator-<versione>-android.apk`. Il predefinito
+// (`CutCalculator-0.6.0-windows-x64.zip`): `CutCalculator-<versione>-android.apk`. Il predefinito
 // era `android-release.apk`, che fuori dalla cartella di build non dice ne' che app sia ne' quale
 // versione. La **debug** tiene il suo suffisso: ha una firma diversa e installarla sopra la release
 // fallisce, quindi le due non devono somigliarsi al punto da confonderle.

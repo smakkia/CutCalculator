@@ -106,6 +106,13 @@ val pacchettoWindows by tasks.registering {
 
     inputs.dir(distribuzione)
     inputs.file(icona)
+    // ⚠️ La versione va dichiarata **input del task**, non basta usarla dentro il `doLast`: Gradle
+    // guarda file e proprietà dichiarate, non il codice del blocco. Alzando la versione a 0.6.0 il
+    // task risultava aggiornato e jpackage non ripartiva: lo **zip** prendeva il nome nuovo (quello
+    // sì dipende da `archiveFileName`) ma dentro c'era l'eseguibile della versione precedente, che
+    // continuava a dichiararsi 0.5.0 nelle sue proprietà. Un pacchetto che mente sulla propria
+    // versione è peggio di uno che non si costruisce.
+    inputs.property("versione", versione)
     outputs.dir(destinazione)
 
     doLast {
